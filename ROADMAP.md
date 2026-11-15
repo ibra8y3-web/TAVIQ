@@ -15,7 +15,7 @@ Status reflects committed implementation and CI evidence, not documentation dire
 | 09 | Compute | dynamic GPU host plus optional OpenCL vector-add provider (GPU preferred, CPU fallback) | production Vulkan/CUDA/Metal modules and physical GPU validation |
 | 10 | Security | capability policy and fail-closed Linux Bubblewrap launcher | VM integration and Windows/macOS/Android sandbox adapters |
 | 11 | Standard library | bounded arrays, workspace file IO, UTC time, binary serialization, plain TCP | TLS, JSON, async and broader collections/platform APIs |
-| 12 | Packages | semver resolver, signed index publishing and local registry | automatic transitive installation and hosted service |
+| 12 | Packages | semver resolver, transactional transitive installs, SHA-256 archive verification, signed registry verification and lockfile | hosted registry, publishing/discovery service and package namespace policy |
 | 13 | Developer tools | formatter, linter, inspector, profiler, trace breakpoints and initial LSP | full semantic LSP and interactive source debugger |
 | 14 | Platforms | Android Gradle/JNI app and emulator tests | physical device testing, lifecycle/storage polish |
 | 15 | Studio | loopback editor, project actions and diagnostics | full LSP/debugger UI integration |
