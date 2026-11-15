@@ -2,29 +2,61 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-def run(args,cwd,expect=0):
- r=subprocess.run(args,cwd=cwd,text=True,capture_output=True,timeout=60)
- if r.returncode!=expect:raise AssertionError("command %r returned %s\nstdout=%s\nstderr=%s"%(args,r.returncode,r.stdout,r.stderr))
- return r
+
+def run(args, cwd, expect=0):
+    result = subprocess.run(args, cwd=cwd, text=True, capture_output=True, timeout=60)
+    if result.returncode != expect:
+        raise AssertionError("command %r returned %s\nstdout=%s\nstderr=%s" %
+                             (args, result.returncode, result.stdout, result.stderr))
+    return result
+
 def main():
- binary=Path(sys.argv[1]).resolve();cc=sys.argv[2] if len(sys.argv)>2 else ""
- with tempfile.TemporaryDirectory(prefix="taviq-cli-") as d:
-  root=Path(d);source=root/"smoke.taviq";source.write_text('flow main { let x = sqrt(36) + abs(-6); display x; display len("abc"); }\n',encoding="utf-8")
-  assert "12" in run([str(binary),"run",str(source)],root).stdout
-  assert "valid" in run([str(binary),"check",str(source)],root).stdout
-  bc=root/"smoke.tvqbc";run([str(binary),"compile",str(source),"-o",str(bc)],root)
-  assert "12" in run([str(binary),"run-bytecode",str(bc)],root).stdout
-  assert "LENGTH" in run([str(binary),"disasm",str(bc)],root).stdout
-  gen=root/"smoke.c";run([str(binary),"emit-c",str(source),"-o",str(gen)],root)
-  src=root/"native-src";build=root/"native-build";src.mkdir();(src/"main.c").write_text(gen.read_text(encoding="utf-8"),encoding="utf-8")
-  cmake=["cmake_minimum_required(VERSION 3.20)","project(TAVIQNativeSmoke LANGUAGES C)","add_executable(taviq_native_smoke main.c)","if(NOT MSVC)","target_link_libraries(taviq_native_smoke PRIVATE m)","endif()",""]
-  (src/"CMakeLists.txt").write_text("\n".join(cmake),encoding="utf-8")
-  args=["cmake","-S",str(src),"-B",str(build),"-DCMAKE_BUILD_TYPE=Release"]
-  if cc:args.append("-DCMAKE_C_COMPILER="+cc)
-  run(args,root);run(["cmake","--build",str(build),"--config","Release","--parallel"],root)
-  options=[build/"Release"/"taviq_native_smoke.exe",build/"taviq_native_smoke.exe",build/"Release"/"taviq_native_smoke",build/"taviq_native_smoke"]
-  exe=next((p for p in options if p.is_file()),None)
-  if exe is None:raise AssertionError("native C executable not found")
-  result=run([str(exe)],root);assert "12" in result.stdout and "3" in result.stdout
- return 0
-if __name__=="__main__":raise SystemExit(main())
+    binary = Path(sys.argv[1]).resolve()
+    c_compiler = sys.argv[2] if len(sys.argv) > 2 else ""
+    repo = Path(__file__).resolve().parents[2]
+    dev = repo / "tools" / "taviq_dev.py"
+    with tempfile.TemporaryDirectory(prefix="taviq-cli-") as directory:
+        root = Path(directory)
+        source = root / "smoke.taviq"
+        source.write_text('flow main { let x = sqrt(36) + abs(-6); display x; display len("abc"); }\n', encoding="utf-8")
+        assert "12" in run([str(binary), "run", str(source)], root).stdout
+        assert "valid" in run([str(binary), "check", str(source)], root).stdout
+        bytecode = root / "smoke.tvqbc"
+        run([str(binary), "compile", str(source), "-o", str(bytecode)], root)
+        assert "12" in run([str(binary), "run-bytecode", str(bytecode)], root).stdout
+        assert "LENGTH" in run([str(binary), "disasm", str(bytecode)], root).stdout
+
+        formatted = run([sys.executable, str(dev), "format", str(source)], root)
+        assert "formatted:" in formatted.stdout
+        run([sys.executable, str(dev), "format", "--check", str(source)], root)
+        run([sys.executable, str(dev), "lint", str(source), "--compiler", str(binary)], root)
+        assert "LENGTH" in run([sys.executable, str(dev), "inspect", str(source), "--compiler", str(binary)], root).stdout
+        assert "profile runs=3" in run([sys.executable, str(dev), "profile", str(source), "--compiler", str(binary), "--runs", "3"], root).stdout
+
+        generated_c = root / "smoke.c"
+        run([str(binary), "emit-c", str(source), "-o", str(generated_c)], root)
+        native_source = root / "native-source"
+        native_build = root / "native-build"
+        native_source.mkdir()
+        (native_source / "main.c").write_text(generated_c.read_text(encoding="utf-8"), encoding="utf-8")
+        cmakelists = ["cmake_minimum_required(VERSION 3.20)",
+            "project(TAVIQNativeSmoke LANGUAGES C)", "add_executable(taviq_native_smoke main.c)",
+            "if(NOT MSVC)", "  target_link_libraries(taviq_native_smoke PRIVATE m)", "endif()", ""]
+        (native_source / "CMakeLists.txt").write_text("\n".join(cmakelists), encoding="utf-8")
+        configure = ["cmake", "-S", str(native_source), "-B", str(native_build), "-DCMAKE_BUILD_TYPE=Release"]
+        if c_compiler:
+            configure.append("-DCMAKE_C_COMPILER=" + c_compiler)
+        run(configure, root)
+        run(["cmake", "--build", str(native_build), "--config", "Release", "--parallel"], root)
+        candidates = [native_build / "Release" / "taviq_native_smoke.exe",
+            native_build / "taviq_native_smoke.exe", native_build / "Release" / "taviq_native_smoke",
+            native_build / "taviq_native_smoke"]
+        executable = next((p for p in candidates if p.is_file()), None)
+        if executable is None:
+            raise AssertionError("native C executable not found")
+        native = run([str(executable)], root)
+        assert "12" in native.stdout and "3" in native.stdout
+    return 0
+
+if __name__ == "__main__":
+    raise SystemExit(main())
