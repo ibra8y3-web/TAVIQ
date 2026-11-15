@@ -1,4 +1,6 @@
 #include "taviq/vm.hpp"
+#include <ostream>
+#include <utility>
 #include <variant>
 #include <vector>
 #include <cmath>

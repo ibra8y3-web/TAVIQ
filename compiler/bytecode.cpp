@@ -1,6 +1,10 @@
 #include "taviq/bytecode.hpp"
-#include <bit>
 #include <array>
+#include <bit>
+#include <cstdio>
+#include <istream>
+#include <ostream>
+#include <utility>
 namespace taviq {
 namespace {
 void putU32(std::ostream& o,std::uint32_t v){for(int i=0;i<4;++i)o.put(static_cast<char>((v>>(i*8))&0xff));}

@@ -43,7 +43,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: ''
       - name: Install Android NDK and CMake
         run: sdkmanager --install "ndk;27.2.12479018" "cmake;3.31.6"
       - name: Configure Android

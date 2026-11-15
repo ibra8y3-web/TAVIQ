@@ -25,7 +25,7 @@ jobs:
       - name: Python security lint
         run: |
           python -m pip install --disable-pip-version-check bandit
-          bandit -q -r ai tools studio -x tests
+          bandit -q -lll -r ai tools studio -x tests
       - name: Dependency review
         if: github.event_name == 'pull_request'
         uses: actions/dependency-review-action@v4
