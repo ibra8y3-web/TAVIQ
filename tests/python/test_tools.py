@@ -23,6 +23,14 @@ class ToolSafetyTests(unittest.TestCase):
         self.assertEqual(str(hub.safe_file("weights/model.gguf")), "weights/model.gguf")
         with self.assertRaises(ValueError): hub.safe_file("../../evil.py")
         with self.assertRaises(ValueError): hub.safe_file("weights/evil.pkl")
+        with self.assertRaises(ValueError): hub.safe_file("..\\..\\escape.gguf")
+        with self.assertRaises(ValueError): hub.safe_file("C:\\escape.gguf")
+
+    def test_package_version_rejects_traversal(self):
+        self.assertEqual(pkg.valid_version("1.2.3-beta.1+build"), "1.2.3-beta.1+build")
+        for value in ("../escape", "..\\escape", "/root", "C:escape", ""):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                pkg.valid_version(value)
 
     def test_package_path_rejects_traversal(self):
         with tempfile.TemporaryDirectory() as d:

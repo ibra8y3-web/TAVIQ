@@ -54,6 +54,8 @@ def safe_model_id(value):
     return value
 
 def safe_file(value):
+    if "\\" in value or ":" in value:
+        raise ValueError("unsafe model filename: " + value)
     p = PurePosixPath(value)
     if p.is_absolute() or not p.parts or any(x in ("", ".", "..") for x in p.parts):
         raise ValueError("unsafe model filename: " + value)

@@ -25,6 +25,11 @@ def valid_name(value):
         raise ValueError("invalid package name")
     return value
 
+def valid_version(value):
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9.+_-]{0,79}", value):
+        raise ValueError("invalid package version")
+    return value
+
 def digest(path):
     h = hashlib.sha256()
     with path.open("rb") as f:
@@ -138,6 +143,7 @@ def main():
             versions = lock.get("packages", {}).get(name, {})
             targets = [args.version] if args.version else list(versions)
             for version in targets:
+                version = valid_version(version)
                 if version not in versions:
                     raise ValueError("package version is not installed: %s@%s" % (name, version))
                 shutil.rmtree(package_root / name / version, ignore_errors=True)
@@ -146,14 +152,15 @@ def main():
                 lock.get("packages", {}).pop(name, None)
             tmp = lock_path.with_suffix(".lock.part"); tmp.write_text(json.dumps(lock, indent=2), encoding="utf-8"); os.replace(tmp, lock_path)
             return 0
+        version = valid_version(args.version)
         index = load_index(args.index)
-        entry = index.get("packages", {}).get(name, {}).get("versions", {}).get(args.version)
+        entry = index.get("packages", {}).get(name, {}).get("versions", {}).get(version)
         if not isinstance(entry, dict):
             raise ValueError("package/version not found in registry index")
         url, expected = entry.get("url"), entry.get("sha256", "").lower()
         if not isinstance(url, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
             raise ValueError("registry entry must supply an HTTPS archive URL and SHA-256")
-        dest = package_root / name / args.version
+        dest = package_root / name / version
         if dest.exists() and not args.force:
             raise ValueError("package is already installed; pass --force to replace it")
         package_root.mkdir(parents=True, exist_ok=True)
@@ -167,10 +174,10 @@ def main():
             if dest.exists():
                 shutil.rmtree(dest)
             dest.parent.mkdir(parents=True, exist_ok=True); os.replace(staging, dest)
-        lock.setdefault("packages", {}).setdefault(name, {})[args.version] = {
+        lock.setdefault("packages", {}).setdefault(name, {})[version] = {
             "sha256": expected, "source": url, "path": str(dest.relative_to(root))}
         tmp = lock_path.with_suffix(".lock.part"); tmp.write_text(json.dumps(lock, indent=2), encoding="utf-8"); os.replace(tmp, lock_path)
-        print("installed", name + "@" + args.version, "without executing package scripts")
+        print("installed", name + "@" + version, "without executing package scripts")
         return 0
     except (OSError, ValueError, KeyError, tarfile.TarError, zipfile.BadZipFile,
             urllib.error.URLError, json.JSONDecodeError) as exc:
