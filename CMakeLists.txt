@@ -41,8 +41,7 @@ if(Python3_Interpreter_FOUND)
         COMMAND ${Python3_EXECUTABLE}
                 ${CMAKE_CURRENT_SOURCE_DIR}/tests/python/test_cli.py
                 $<TARGET_FILE:taviq>
-                "${CMAKE_C_COMPILER}"
-                "${CMAKE_C_COMPILER_ID}")
+                "${CMAKE_C_COMPILER}")
     add_test(NAME taviq_python_tool_tests
         COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_CURRENT_SOURCE_DIR}/tests/python -v)
 endif()
