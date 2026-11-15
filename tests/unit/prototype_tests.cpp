@@ -34,7 +34,13 @@ int main(){
  std::ostringstream arithmeticOut;CHECK(taviq::VM{}.run(arithmetic,arithmeticOut,error)==0);
  CHECK(arithmeticOut.str()=="14\n25\nhello TAVIQ\n5\n12\n");
 
- const auto functions=compileSource(R"TAVIQ(fn greet(name: string) -> string { return "hello " + name; }\nfn twice(value: number) -> number { return value * 2; }\nfn choose(flag: bool) -> bool { if (flag) { return true; } else { return false; } }\nfn factorial(n: number) -> number { if (n <= 1) { return 1; } else { return n * factorial(n - 1); } }\nflow main { display greet("TAVIQ"); display twice(21); display choose(false); display factorial(6); })TAVIQ");
+ std::string functionNativeC;std::vector<std::string> functionNativeErrors;
+ std::vector<std::string> functionErrors;taviq::Bytecode functionBad;
+ const auto functions=compileSource(R"TAVIQ(fn greet(name: string) -> string { return "hello " + name; }
+fn twice(value: number) -> number { return value * 2; }
+fn choose(flag: bool) -> bool { if (flag) { return true; } else { return false; } }
+fn factorial(n: number) -> number { if (n <= 1) { return 1; } else { return n * factorial(n - 1); } }
+flow main { display greet("TAVIQ"); display twice(21); display choose(false); display factorial(6); })TAVIQ");
  CHECK(functions.formatVersion==3);CHECK(functions.functions.size()==4);CHECK(taviq::verifyBytecode(functions,error));
  std::ostringstream functionsOut;CHECK(taviq::VM{}.run(functions,functionsOut,error)==0);
  CHECK(functionsOut.str()=="hello TAVIQ\n42\nfalse\n720\n");
@@ -43,11 +49,11 @@ int main(){
  CHECK(taviq::Bytecode::load(functionBytes,functionsLoaded,error));CHECK(functionsLoaded.formatVersion==3);
  std::ostringstream loadedFunctionOut;CHECK(taviq::VM{}.run(functionsLoaded,loadedFunctionOut,error)==0);
  CHECK(loadedFunctionOut.str()==functionsOut.str());
- CHECK(!taviq::emitC(parse("fn identity(x: number) -> number { return x; } flow main { display identity(1); }"),generatedC,nativeErrors));
- CHECK(!taviq::compile(parse("fn bad(x: number) -> number { return true; } flow main { display bad(1); }"),bad,errors));errors.clear();
- CHECK(!taviq::compile(parse("fn bad(x: number) -> number { display x; } flow main { display bad(1); }"),bad,errors));errors.clear();
- CHECK(!taviq::compile(parse("fn bad(x: number) -> number { return x; } flow main { display bad(\"x\"); }"),bad,errors));errors.clear();
- CHECK(!taviq::compile(parse("fn bad(x: number) -> number { return x; } flow main { display bad(1,2); }"),bad,errors));errors.clear();
+ CHECK(!taviq::emitC(parse("fn identity(x: number) -> number { return x; } flow main { display identity(1); }"),functionNativeC,functionNativeErrors));
+ CHECK(!taviq::compile(parse("fn bad(x: number) -> number { return true; } flow main { display bad(1); }"),functionBad,functionErrors));functionErrors.clear();
+ CHECK(!taviq::compile(parse("fn bad(x: number) -> number { display x; } flow main { display bad(1); }"),functionBad,functionErrors));functionErrors.clear();
+ CHECK(!taviq::compile(parse("fn bad(x: number) -> number { return x; } flow main { display bad(\"x\"); }"),functionBad,functionErrors));functionErrors.clear();
+ CHECK(!taviq::compile(parse("fn bad(x: number) -> number { return x; } flow main { display bad(1,2); }"),functionBad,functionErrors));functionErrors.clear();
  const auto recursive=compileSource("fn forever(n: number) -> number { return forever(n + 1); } flow main { display forever(0); }");
  std::ostringstream recursiveOut;CHECK(taviq::VM{}.run(recursive,recursiveOut,error,100000)!=0);
  CHECK(error=="QVM maximum call depth exceeded");
