@@ -25,7 +25,7 @@
 
 The loader, serializer and VM entry point call the same verifier. V1 is checked as straight-line bytecode. V2 uses a control-flow worklist and validates every encoded instruction, jump target, stack height/type at merge points, local definite initialization, local mutability, type consistency, and final reachable HALT.
 
-The verifier rejects invalid opcodes, non-finite constants, type-invalid operations, stack underflow, path-dependent uninitialized loads, repeated immutable stores, mutable type changes, malformed control flow, invalid jump targets, non-final HALT, trailing bytes, oversized encoded strings and live string usage above 16 MiB.
+The verifier rejects invalid opcodes, non-finite constants, type-invalid operations, stack underflow, path-dependent uninitialized loads, repeated immutable stores, mutable type changes, malformed control flow, invalid jump targets, invalid local resets, non-final HALT, trailing bytes, oversized encoded strings and live string usage above 16 MiB.
 
 A loop that grows a carried string without a statically stable bounded size is rejected conservatively. Runtime execution also enforces an instruction budget, counting executed instructions rather than only bytecode length.
 

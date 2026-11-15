@@ -6,7 +6,7 @@ TAVIQ is an open-source programming-language project for AI-oriented and high-pe
 
 ## Working implementation
 
-- C++20 frontend with flow main, immutable let, mutable var, assignment, display, Boolean expressions, comparisons, if/else and while.
+- C++20 frontend with flow main, immutable let, mutable var, assignment, display, Boolean expressions, comparisons, if/else, while, typed functions, parameters and return values (non-recursive call-site expansion).
 - Lexical block scopes, inferred or explicitly annotated number/string/bool declarations, and static type mismatch diagnostics.
 - QVM v2 with conditional/unconditional jumps, CFG-aware verification, runtime instruction budgets and v1 bytecode loading compatibility.
 - Deterministic QVM/lexer/parser mutation tests.
@@ -65,4 +65,4 @@ The Hub installs model assets at an immutable revision. An independently install
 
 ## Engineering status
 
-See ROADMAP.md, docs/LANGUAGE_SPEC.md, docs/VM_BYTECODE.md, docs/MEMORY_MODEL.md and docs/PLATFORM_SUPPORT.md. User-defined functions, modules, richer type-system features, LLVM, a native AI engine, production GPU backends, OS sandboxing, full standard library, public signed package registry, debugger/LSP and Android runtime testing remain outstanding.
+See ROADMAP.md, docs/LANGUAGE_SPEC.md, docs/VM_BYTECODE.md, docs/MEMORY_MODEL.md and docs/PLATFORM_SUPPORT.md. Native QVM call frames and recursion, modules, richer type-system features, LLVM, a native AI engine, production GPU backends, OS sandboxing, full standard library, public signed package registry, debugger/LSP and Android runtime testing remain outstanding.

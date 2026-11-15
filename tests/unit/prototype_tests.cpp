@@ -37,6 +37,8 @@ int main(){
  const auto annotated=compileSource("flow main { let count: number=3; var label: string=\"ready\"; var active: bool=true; display count; display label; display active; }");
  std::ostringstream annotatedOut;CHECK(taviq::VM{}.run(annotated,annotatedOut,error)==0);
  CHECK(annotatedOut.str()=="3\nready\ntrue\n");
+ std::vector<std::string> functionErrors;
+ taviq::Bytecode rejectedFunction;
  const std::string functionSource=
   "fn add(a: number, b: number) -> number { let result: number=a+b; return result; } "
   "fn maximum(a: number, b: number) -> number { if (a>b) { return a; } else { return b; } } "
@@ -45,19 +47,19 @@ int main(){
   "flow main { display add(2,3); display maximum(8,5); display twice(4); "
   "var i=0; while(i<2) { display add(i,10); i=i+1; } display greeting(); }";
  auto functionProgram=parse(functionSource);
- taviq::Bytecode functionCode;errors.clear();
- CHECK(taviq::compile(functionProgram,functionCode,errors));
+ taviq::Bytecode functionCode;functionErrors.clear();
+ CHECK(taviq::compile(functionProgram,functionCode,functionErrors));
  std::ostringstream functionOut;
  CHECK(taviq::VM{}.run(functionCode,functionOut,error)==0);
  CHECK(functionOut.str()=="5\\n8\\n12\\n10\\n11\\nhello\\n");
  CHECK(taviq::verifyBytecode(functionCode,error));
 
- CHECK(!taviq::compile(parse("fn missing(a: number) -> number { let x=a; } flow main { display 1; }"),bad,errors));errors.clear();
- CHECK(!taviq::compile(parse("fn one(a: number) -> number { return a; } flow main { display one(); }"),bad,errors));errors.clear();
- CHECK(!taviq::compile(parse("fn one(a: number) -> number { return a; } flow main { display one(\"x\"); }"),bad,errors));errors.clear();
- CHECK(!taviq::compile(parse("fn recurse(a: number) -> number { return recurse(a); } flow main { display recurse(1); }"),bad,errors));errors.clear();
- CHECK(!taviq::compile(parse("flow main { return 1; }"),bad,errors));errors.clear();
- CHECK(!taviq::compile(parse("fn one(a: number) -> number { return a; } flow main { display one(1,2); }"),bad,errors));errors.clear();
+ CHECK(!taviq::compile(parse("fn missing(a: number) -> number { let x=a; } flow main { display 1; }"),rejectedFunction,functionErrors));functionErrors.clear();
+ CHECK(!taviq::compile(parse("fn one(a: number) -> number { return a; } flow main { display one(); }"),rejectedFunction,functionErrors));functionErrors.clear();
+ CHECK(!taviq::compile(parse("fn one(a: number) -> number { return a; } flow main { display one(\"x\"); }"),rejectedFunction,functionErrors));functionErrors.clear();
+ CHECK(!taviq::compile(parse("fn recurse(a: number) -> number { return recurse(a); } flow main { display recurse(1); }"),rejectedFunction,functionErrors));functionErrors.clear();
+ CHECK(!taviq::compile(parse("flow main { return 1; }"),rejectedFunction,functionErrors));functionErrors.clear();
+ CHECK(!taviq::compile(parse("fn one(a: number) -> number { return a; } flow main { display one(1,2); }"),rejectedFunction,functionErrors));functionErrors.clear();
 
 
  const auto control=compileSource(
