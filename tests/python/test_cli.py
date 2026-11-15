@@ -44,6 +44,30 @@ def main():
         invalid_type.write_text('flow main { let count:number="bad"; }\n', encoding="utf-8")
         run([str(binary), "check", str(invalid_type)], root, expect=1)
 
+        functions = root / "functions.taviq"
+        functions.write_text("""fn add(a: number, b: number) -> number {
+    return a + b;
+}
+fn factorial(n: number) -> number {
+    if (n <= 1) {
+        return 1;
+    } else {
+        return n * factorial(n - 1);
+    }
+}
+flow main {
+    display add(20, 22);
+    display factorial(6);
+}
+""", encoding="utf-8")
+        assert run([str(binary), "run", str(functions)], root).stdout == "42\n720\n"
+        function_bytecode = root / "functions.tvqbc"
+        run([str(binary), "compile", str(functions), "-o", str(function_bytecode)], root)
+        assert run([str(binary), "run-bytecode", str(function_bytecode)], root).stdout == "42\n720\n"
+        assert "CALL" in run([str(binary), "disasm", str(function_bytecode)], root).stdout
+        run([sys.executable, str(dev), "format", str(functions)], root)
+        run([sys.executable, str(dev), "format", "--check", str(functions)], root)
+        run([sys.executable, str(dev), "lint", str(functions), "--compiler", str(binary)], root)
         structured = root / "structured.taviq"
         structured.write_text(
             'flow main { var n=0; while(n<3){ n=n+1; if(n==2){display true;}else{display false;} } }\n',

@@ -10,7 +10,7 @@ import tempfile
 import time
 
 TOKEN = re.compile(
-    r'"(?:\\.|[^"\\])*"|==|!=|<=|>=|'
+    r'"(?:\\.|[^"\\])*"|->|==|!=|<=|>=|'
     r'[A-Za-z_][A-Za-z0-9_]*|(?:\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|[{}();,:+*/=!<>-]'
 )
 BINARY_OPERATORS = {"=", "==", "!=", "<", "<=", ">", ">=", "+", "-", "*", "/", "and", "or"}
@@ -35,23 +35,26 @@ def tokenize(source):
 
 def format_source(source):
     tokens = tokenize(source)
-    if len(tokens) < 4 or tokens[:3] != ["flow", "main", "{"] or tokens[-1] != "}":
-        raise ValueError("formatter: expected one flow main block")
-
-    lines = ["flow main {"]
-    indent = 1
+    if len(tokens) < 4 or tokens[-1] != "}":
+        raise ValueError("formatter: expected a flow main block")
+    try:
+        main_index = tokens.index("flow")
+    except ValueError as exc:
+        raise ValueError("formatter: missing flow main block") from exc
+    if tokens[main_index:main_index + 3] != ["flow", "main", "{"]:
+        raise ValueError("formatter: expected flow main block")
+    lines = []
+    indent = 0
     current = ""
     previous = None
     paren_depth = 0
-
+    binary_operators = BINARY_OPERATORS | {"->"}
     def emit(text):
         lines.append(("    " * indent) + text.strip())
-
-    for index, token in enumerate(tokens[3:-1], start=3):
+    for index, token in enumerate(tokens):
         next_token = tokens[index + 1] if index + 1 < len(tokens) else None
-
         if token == "(":
-            if previous in {"if", "while", "display", "let", "var"}:
+            if previous in {"if", "while", "display", "let", "var", "fn"}:
                 current = current.rstrip() + " "
             current += "("
             paren_depth += 1
@@ -71,7 +74,7 @@ def format_source(source):
                 emit(current)
                 current = ""
             indent -= 1
-            if indent < 1:
+            if indent < 0:
                 raise ValueError("formatter: unmatched '}'")
             current = "}"
             if next_token != "else":
@@ -93,27 +96,23 @@ def format_source(source):
             current = current.rstrip() + ", "
         elif token == ":":
             current = current.rstrip() + ": "
-        elif token in BINARY_OPERATORS:
+        elif token == "->":
+            current = current.rstrip() + " -> "
+        elif token in binary_operators:
             current = current.rstrip() + " " + token + " "
         elif token == "!":
             current = current.rstrip() + "!"
         else:
-            if current and previous not in {"(", ",", ":", "!", *BINARY_OPERATORS}:
+            if current and previous not in {"(", ",", ":", "!", *binary_operators}:
                 current += " "
             current += token
-
         previous = token
-
     if paren_depth != 0:
         raise ValueError("formatter: unbalanced parentheses")
     if current.strip():
-        if current == "}":
-            emit(current)
-        else:
-            raise ValueError("formatter: statement is missing ';'")
-    if indent != 1:
+        raise ValueError("formatter: unclosed block or statement")
+    if indent != 0:
         raise ValueError("formatter: unbalanced braces")
-    lines.append("}")
     return "\n".join(lines) + "\n"
 
 def run_compiler(compiler, command, source, timeout=60):
