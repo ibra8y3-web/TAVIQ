@@ -1,0 +1,2 @@
+TAVIQ project. Third-party dependencies are not vendored in this foundation scaffold.
+Any dependency added later must be recorded with its version, license, source, and notices.

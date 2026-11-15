@@ -1,0 +1,11 @@
+[project]
+name = "hello-taviq"
+version = "0.1.0"
+language_edition = "0.1"
+entry = "examples/hello.taviq"
+
+[build]
+backend = "prototype-interpreter"
+
+[dependencies]
+# Add reviewed, pinned dependencies here.

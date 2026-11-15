@@ -1,0 +1,4 @@
+flow main {
+    display "Hello from TAVIQ";
+    display "The first language prototype is running.";
+}

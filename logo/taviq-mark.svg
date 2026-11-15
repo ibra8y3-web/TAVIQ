@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
+  <defs>
+    <linearGradient id="metal" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f4fbff"/>
+      <stop offset=".35" stop-color="#9cb9d2"/>
+      <stop offset=".7" stop-color="#42617f"/>
+      <stop offset="1" stop-color="#d8e8f5"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="800" rx="150" fill="#101722"/>
+  <path d="M400 100 660 250 660 550 400 700 140 550 140 250Z" fill="none" stroke="url(#metal)" stroke-width="28"/>
+  <path d="M250 280H550V355H438V550H362V355H250Z" fill="url(#metal)"/>
+  <path d="M400 100 660 250 400 400 140 250Z" fill="#253b52" opacity=".65"/>
+</svg>
