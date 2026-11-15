@@ -17,7 +17,9 @@ pkg = load_tool("taviq_pkg", "tools/taviq_pkg.py")
 class ToolSafetyTests(unittest.TestCase):
     def test_model_id_and_allowlist(self):
         self.assertEqual(hub.safe_model_id("org/model"), "org/model")
-        with self.assertRaises(ValueError): hub.safe_model_id("../model")
+        for value in ("../model", "org/../model", "org/.", "/model", "org//model", "a\\b"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                hub.safe_model_id(value)
         self.assertEqual(str(hub.safe_file("weights/model.gguf")), "weights/model.gguf")
         with self.assertRaises(ValueError): hub.safe_file("../../evil.py")
         with self.assertRaises(ValueError): hub.safe_file("weights/evil.pkl")
@@ -25,6 +27,7 @@ class ToolSafetyTests(unittest.TestCase):
     def test_package_path_rejects_traversal(self):
         with tempfile.TemporaryDirectory() as d:
             with self.assertRaises(ValueError): pkg.safe_target(Path(d), "../escape.txt")
+            with self.assertRaises(ValueError): pkg.safe_target(Path(d), "subdir\\..\\escape.txt")
 
     def test_zip_extraction(self):
         with tempfile.TemporaryDirectory() as d:

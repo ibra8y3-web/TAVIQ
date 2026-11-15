@@ -46,8 +46,11 @@ def download_file(url, target, limit):
     return total, h.hexdigest()
 
 def safe_model_id(value):
-    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", value):
-        raise ValueError("model id must be owner/name")
+    parts = value.split("/")
+    if len(parts) != 2 or any(part in ("", ".", "..") for part in parts):
+        raise ValueError("model id must be owner/name without traversal components")
+    if any(not re.fullmatch(r"[A-Za-z0-9_.-]+", part) for part in parts):
+        raise ValueError("model id contains unsupported characters")
     return value
 
 def safe_file(value):
