@@ -276,7 +276,17 @@ def install_resolution(root, index, resolution, lock, index_reference, root_name
             if not isinstance(installed_versions, dict):
                 raise ValueError("invalid lock entries for package " + package_name)
             existing = installed_versions.get(package_version)
+            dependencies = entry.get("dependencies", {})
+            if not isinstance(dependencies, dict):
+                raise ValueError("dependencies for %s@%s must be an object" %
+                                 (package_name, package_version))
             if destination.is_dir() and isinstance(existing, dict) and existing.get("sha256") == expected and not force:
+                existing.update({
+                    "source": url,
+                    "path": str(destination.relative_to(root)),
+                    "dependencies": dict(sorted(dependencies.items())),
+                    "registry_sha256": registry_sha256,
+                })
                 already_installed.append(package_name + "@" + package_version)
                 continue
             if destination.exists() and not force:
@@ -308,10 +318,7 @@ def install_resolution(root, index, resolution, lock, index_reference, root_name
                 installed_now.append(destination)
 
             for package_name, package_version, url, expected, entry, staged, destination in prepared:
-                dependencies = entry.get("dependencies", {})
-                if not isinstance(dependencies, dict):
-                    raise ValueError("dependencies for %s@%s must be an object" %
-                                     (package_name, package_version))
+                dependencies = entry["dependencies"]
                 lock_packages.setdefault(package_name, {})[package_version] = {
                     "sha256": expected,
                     "source": url,
