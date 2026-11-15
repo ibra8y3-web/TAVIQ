@@ -7,6 +7,8 @@
 #include <utility>
 namespace taviq {
 namespace {
+constexpr std::size_t MaxLocals=65'536;
+constexpr std::size_t MaxFunctions=65'536;
 enum class Type { Number, String, Boolean };
 struct Binding { std::uint32_t slot{}; Type type{Type::Number}; bool mutableLocal{false}; };
 struct Signature {
