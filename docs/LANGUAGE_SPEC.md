@@ -1,4 +1,4 @@
-# TAVIQ Language Specification — Draft 0.4
+# TAVIQ Language Specification — Draft 0.5
 
 ## Program form
 
