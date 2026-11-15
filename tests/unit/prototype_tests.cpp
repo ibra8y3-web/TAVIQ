@@ -37,7 +37,7 @@ int main(){
  const auto functions=compileSource(R"TAVIQ(fn greet(name: string) -> string { return "hello " + name; }\nfn twice(value: number) -> number { return value * 2; }\nfn choose(flag: bool) -> bool { if (flag) { return true; } else { return false; } }\nfn factorial(n: number) -> number { if (n <= 1) { return 1; } else { return n * factorial(n - 1); } }\nflow main { display greet("TAVIQ"); display twice(21); display choose(false); display factorial(6); })TAVIQ");
  CHECK(functions.formatVersion==3);CHECK(functions.functions.size()==4);CHECK(taviq::verifyBytecode(functions,error));
  std::ostringstream functionsOut;CHECK(taviq::VM{}.run(functions,functionsOut,error)==0);
- CHECK(functionsOut.str()=="hello TAVIQ\\n42\\nfalse\\n720\\n");
+ CHECK(functionsOut.str()=="hello TAVIQ\n42\nfalse\n720\n");
  std::stringstream functionBytes(std::ios::in|std::ios::out|std::ios::binary);
  CHECK(functions.save(functionBytes,error));functionBytes.seekg(0);taviq::Bytecode functionsLoaded;
  CHECK(taviq::Bytecode::load(functionBytes,functionsLoaded,error));CHECK(functionsLoaded.formatVersion==3);
@@ -145,7 +145,7 @@ int main(){
  std::stringstream v2Bytes(std::ios::in|std::ios::out|std::ios::binary);
  CHECK(v2.save(v2Bytes,error));v2Bytes.seekg(0);taviq::Bytecode v2Loaded;
  CHECK(taviq::Bytecode::load(v2Bytes,v2Loaded,error));CHECK(v2Loaded.formatVersion==2);
- std::ostringstream v2Out;CHECK(taviq::VM{}.run(v2Loaded,v2Out,error)==0);CHECK(v2Out.str()=="11\\n");
+ std::ostringstream v2Out;CHECK(taviq::VM{}.run(v2Loaded,v2Out,error)==0);CHECK(v2Out.str()=="11\n");
 
  taviq::Bytecode legacy;legacy.formatVersion=1;
  legacy.code.push_back({taviq::OpCode::PushNumber,7.0,0,{}});

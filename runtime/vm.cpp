@@ -224,7 +224,7 @@ int VM::run(const Bytecode& bytecode,std::ostream& output,std::string& error,
                 if(!pop(frameBase,value)||!std::holds_alternative<bool>(value))
                     return fail("QVM conditional jump expects a Boolean");
                 if(!std::get<bool>(value)) {
-                    if(ins.slot<frames[frameIndex].pc||ins.slot>=frames[frameIndex].end)
+                    if(ins.slot<frames[frameIndex].start||ins.slot>=frames[frameIndex].end)
                         return fail("QVM conditional jump target is outside the current frame");
                     pc=ins.slot;advancePc=false;
                 }
