@@ -12,7 +12,7 @@ Status reflects committed implementation and CI evidence, not documentation dire
 | 06 | Native backend | C lowering for supported scalar and structured control flow | function/aggregate lowering and LLVM/JIT |
 | 07 | Runtime | bounded managed heap with explicit roots and mark/sweep | connect heap to QVM values, ownership, FFI and OS abstractions |
 | 08 | AI | native provider ABI host and CLI | bundled inference engine, streaming, embeddings and lifecycle |
-| 09 | Compute | dynamic GPU provider host | production Vulkan/CUDA/Metal modules and physical-device validation |
+| 09 | Compute | dynamic GPU host plus optional OpenCL vector-add provider (GPU preferred, CPU fallback) | production Vulkan/CUDA/Metal modules and physical GPU validation |
 | 10 | Security | capability policy and fail-closed Linux Bubblewrap launcher | VM integration and Windows/macOS/Android sandbox adapters |
 | 11 | Standard library | bounded arrays, workspace file IO, UTC time, binary serialization, plain TCP | TLS, JSON, async and broader collections/platform APIs |
 | 12 | Packages | semver resolver, signed index publishing and local registry | automatic transitive installation and hosted service |

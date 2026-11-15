@@ -5,7 +5,8 @@ from pathlib import Path
 import re
 import sys
 
-ALLOWED_CMAKE_PACKAGES = {"Threads", "Python3"}
+# OpenCL is an opt-in native SDK dependency; default builds remain dependency-free.
+ALLOWED_CMAKE_PACKAGES = {"Threads", "Python3", "OpenCL"}
 OPTIONAL_IMPORTS = {
     # These modules are supplied by Blender's embedded Python when this
     # optional procedural-logo script is run inside Blender.
@@ -64,7 +65,7 @@ def main():
         for error in errors:
             print("dependency policy:", error, file=sys.stderr)
         return 1
-    print("Dependency policy passed: Python standard library; Blender API only in its optional logo script; CMake Threads/Python3 only.")
+    print("Dependency policy passed: Python standard library; Blender API is optional for its logo script; CMake Threads/Python3 and opt-in OpenCL only.")
     return 0
 
 if __name__ == "__main__":

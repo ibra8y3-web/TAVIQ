@@ -38,6 +38,22 @@ jobs:
             build/Release/taviq.exe
           if-no-files-found: ignore
 
+  opencl-provider:
+    name: Build and execute optional OpenCL provider
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install OpenCL development files and CPU ICD
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ocl-icd-opencl-dev pocl-opencl-icd
+      - name: Configure with OpenCL provider enabled
+        run: cmake -S . -B build-opencl -DCMAKE_BUILD_TYPE=Release -DTAVIQ_ENABLE_OPENCL_PROVIDER=ON
+      - name: Build
+        run: cmake --build build-opencl --config Release --parallel
+      - name: Run OpenCL provider integration test
+        run: ctest --test-dir build-opencl -C Release -R "taviq_opencl_provider_tests|taviq_gpu_cli_integration" --output-on-failure
+
   android-arm64:
     name: Android NDK cross-build (arm64-v8a)
     runs-on: ubuntu-latest
@@ -83,16 +99,21 @@ jobs:
           gradle-version: "9.9.1"
       - name: Build Android APK with JNI runtime
         run: gradle -p platforms/android --no-daemon :app:assembleDebug
+      - name: Start Android Debug Bridge before emulator launch
+        run: |
+          adb kill-server || true
+          adb start-server
+          adb version
       - name: Run TAVIQ instrumentation tests on an Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 30
           arch: x86_64
           target: google_apis
-          profile: pixel_5
-          force-avd-creation: false
-          emulator-boot-timeout: 600
-          emulator-options: -no-snapshot-load -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          profile: pixel_2
+          force-avd-creation: true
+          emulator-boot-timeout: 900
+          emulator-options: -no-snapshot -wipe-data -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 2048 -cores 2
           disable-animations: true
           script: gradle -p platforms/android --no-daemon :app:connectedDebugAndroidTest
       - uses: actions/upload-artifact@v7
