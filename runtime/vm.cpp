@@ -6,6 +6,8 @@
 #include <cmath>
 namespace taviq {
 int VM::run(const Bytecode& b,std::ostream& output,std::string& error,std::size_t budget)const{
+ error.clear();
+ if(!verifyBytecode(b,error))return 1;
  using Value=std::variant<double,std::string>;std::vector<Value> stack;
  if(b.locals.size()>65536)return (error="QVM local table exceeds limit",1);
  std::vector<Value> locals(b.locals.size());std::vector<bool> initialized(b.locals.size(),false);

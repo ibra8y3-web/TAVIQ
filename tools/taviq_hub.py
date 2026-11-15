@@ -18,6 +18,8 @@ SAFE_NAMES = {"config.json", "generation_config.json", "tokenizer.json",
               "merges.txt", "added_tokens.json", "tokenizer.model",
               "model.safetensors.index.json"}
 MAX_FILE = 20 * 1024 * 1024 * 1024
+MAX_TOTAL = 20 * 1024 * 1024 * 1024
+MAX_SELECTED_FILES = 1000
 
 def request(url, limit=32 * 1024 * 1024):
     req = urllib.request.Request(url, headers={"User-Agent": "TAVIQ-AI-Hub/0.2"})
@@ -65,6 +67,11 @@ def safe_file(value):
         raise ValueError("hidden model paths are not allowed")
     return p
 
+def validate_max_total(value):
+    if not isinstance(value, int) or not 1 <= value <= MAX_TOTAL:
+        raise ValueError("--max-total must be between 1 byte and 20 GiB")
+    return value
+
 def model_info(model_id, revision):
     endpoint = BASE + "/api/models/" + urllib.parse.quote(model_id, safe="/") + "?blobs=true"
     if revision:
@@ -77,6 +84,7 @@ def model_info(model_id, revision):
 
 def install(args):
     model_id = safe_model_id(args.model)
+    max_total = validate_max_total(args.max_total)
     info, sha = model_info(model_id, args.revision)
     tags = info.get("tags") or []
     license_tags = [x.split(":", 1)[1] for x in tags if isinstance(x, str) and x.startswith("license:")]
@@ -93,6 +101,8 @@ def install(args):
     selected = list(dict.fromkeys(selected))
     if not selected:
         raise ValueError("no safe model assets selected; specify one or more --file values")
+    if len(selected) > MAX_SELECTED_FILES:
+        raise ValueError("too many selected model files")
     root = Path(args.destination).expanduser().resolve() / model_id.replace("/", "--")
     root.mkdir(parents=True, exist_ok=True)
     total = 0; records = []
@@ -104,7 +114,7 @@ def install(args):
         expected_size = int(meta.get("size") or (meta.get("lfs") or {}).get("size") or 0)
         if expected_size > MAX_FILE:
             raise ValueError("file is larger than the 20 GiB safety limit: " + name)
-        remaining = min(MAX_FILE, args.max_total - total)
+        remaining = min(MAX_FILE, max_total - total)
         if remaining <= 0:
             raise ValueError("selected files exceed --max-total")
         url = BASE + "/" + urllib.parse.quote(model_id, safe="/") + "/resolve/" + sha + "/" + urllib.parse.quote(name, safe="/")
