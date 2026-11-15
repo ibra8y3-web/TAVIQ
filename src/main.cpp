@@ -1,5 +1,6 @@
 #include "taviq/bytecode.hpp"
 #include "taviq/compiler.hpp"
+#include "taviq/gpu.hpp"
 #include "taviq/lexer.hpp"
 #include "taviq/native.hpp"
 #include "taviq/parser.hpp"
@@ -17,7 +18,18 @@ Parsed parseFile(const std::string& path){
  taviq::Parser parser(tokens);auto p=parser.parse();if(!parser.errors().empty()){for(const auto& e:parser.errors())std::cerr<<e<<'\n';return {};}
  return {std::move(p),true};
 }
-void help(){std::cout<<"TAVIQ 0.2.0\nUsage:\n  taviq <file.taviq>             Run source (compatibility form)\n  taviq run <file.taviq>         Run source in QVM\n  taviq check <file.taviq>       Parse and type-check source\n  taviq compile <file> -o <out>  Emit verified QVM bytecode (.tvqbc)\n  taviq run-bytecode <file>      Run QVM bytecode\n  taviq disasm <file>            Disassemble QVM bytecode\n  taviq emit-c <file> -o <out.c> Emit portable C source for a native toolchain\n  taviq version                  Print version\n";}
+void help(){
+ std::cout<<"TAVIQ 0.2.0\nUsage:\n"
+ <<"  taviq <file.taviq>             Run source (compatibility form)\n"
+ <<"  taviq run <file.taviq>         Run source in QVM\n"
+ <<"  taviq check <file.taviq>       Parse and type-check source\n"
+ <<"  taviq compile <file> -o <out>  Emit verified QVM bytecode (.tvqbc)\n"
+ <<"  taviq run-bytecode <file>      Run QVM bytecode\n"
+ <<"  taviq disasm <file>            Disassemble QVM bytecode\n"
+ <<"  taviq emit-c <file> -o <out.c> Emit portable C source for a native toolchain\n"
+ <<"  taviq gpu-info <provider>      Load a provider and list its compute devices\n"
+ <<"  taviq version                  Print version\n";
+}
 }
 int main(int argc,char** argv){
  if(argc==2&&std::string(argv[1])=="version"){std::cout<<"TAVIQ 0.2.0\n";return 0;}
@@ -25,6 +37,20 @@ int main(int argc,char** argv){
  std::string command=argv[1];int pathIndex=2;
  if(argc==2){command="run";pathIndex=1;}
  if(command=="help"||command=="--help"||command=="-h"){help();return 0;}
+ if(command=="gpu-info"){
+  if(argc!=3){help();return 2;}
+  taviq::GpuProvider provider;std::string error;
+  if(!provider.load(argv[2],error)){std::cerr<<"TAVIQ GPU: "<<error<<'\n';return 1;}
+  const int count=provider.deviceCount(error);
+  if(count<0){std::cerr<<"TAVIQ GPU: "<<error<<'\n';return 1;}
+  std::cout<<"Provider: "<<provider.name()<<"\nDevices: "<<count<<'\n';
+  for(int index=0;index<count;++index){
+   taviq::GpuDeviceInfo info;
+   if(!provider.deviceInfo(index,info,error)){std::cerr<<"TAVIQ GPU: "<<error<<'\n';return 1;}
+   std::cout<<index<<": "<<info.name<<" ["<<info.backend<<"] memory="<<info.memoryBytes<<" bytes\n";
+  }
+  return 0;
+ }
  if(command=="run-bytecode"||command=="disasm"){
   if(argc!=3){help();return 2;}std::ifstream in(argv[2],std::ios::binary);if(!in){std::cerr<<"cannot open bytecode file\n";return 2;}
   taviq::Bytecode b;std::string error;if(!taviq::Bytecode::load(in,b,error)){std::cerr<<error<<'\n';return 1;}
