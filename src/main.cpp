@@ -30,6 +30,7 @@ void help(){
  <<"  taviq emit-c <file> -o <out.c> Emit portable C source for a native toolchain\n"
  <<"  taviq gpu-info <provider>      Load a provider and list its compute devices\n"
  <<"  taviq ai-generate <provider> <prompt> [tokens] [temperature]\n"
+ <<"  taviq debug <file.taviq> [comma-separated-breakpoints]\n"
  <<"  taviq version                  Print version\n";
 }
 }
@@ -71,11 +72,12 @@ int main(int argc,char** argv){
   if(command=="disasm"){std::cout<<taviq::disassemble(b);return 0;}
   return taviq::VM{}.run(b,std::cout,error)?(std::cerr<<error<<'\n',1):0;
  }
- if(command!="run"&&command!="check"&&command!="compile"&&command!="emit-c"){std::cerr<<"unknown command: "<<command<<'\n';help();return 2;}
+ if(command!="run"&&command!="debug"&&command!="check"&&command!="compile"&&command!="emit-c"){std::cerr<<"unknown command: "<<command<<'\n';help();return 2;}
  if(argc<=pathIndex){help();return 2;}const std::string input=argv[pathIndex];std::string output;
  if(command=="compile"||command=="emit-c"){
   if(argc!=5||std::string(argv[3])!="-o"){help();return 2;}output=argv[4];
- }else if(argc!=pathIndex+1){help();return 2;}
+ }else if(command=="debug"){if(argc>4){help();return 2;}}
+ else if(argc!=pathIndex+1){help();return 2;}
  auto parsed=parseFile(input);if(!parsed.ok)return 1;
  taviq::Bytecode bytecode;std::vector<std::string> errors;
  if(command=="emit-c"){
@@ -87,5 +89,23 @@ int main(int argc,char** argv){
  if(command=="compile"){
   std::ofstream out(output,std::ios::binary);std::string error;if(!out||!bytecode.save(out,error)){std::cerr<<(error.empty()?"cannot open output file":error)<<'\n';return 1;}return 0;
  }
- std::string error;return taviq::VM{}.run(bytecode,std::cout,error)?(std::cerr<<error<<'\n',1):0;
+ std::string error;
+ if(command=="debug"){
+  std::vector<std::size_t> breakpoints;
+  if(argc==4){
+   std::string values=argv[3];std::stringstream parts(values);std::string item;
+   while(std::getline(parts,item,',')){
+    try{const auto value=std::stoull(item);if(value>=bytecode.code.size()){std::cerr<<"breakpoint outside bytecode\n";return 2;}breakpoints.push_back(static_cast<std::size_t>(value));}
+    catch(const std::exception&){std::cerr<<"invalid breakpoint list\n";return 2;}
+   }
+  }
+  const auto trace=[&](std::size_t pc,const taviq::Instruction& instruction){
+   if(breakpoints.empty()||std::find(breakpoints.begin(),breakpoints.end(),pc)!=breakpoints.end())
+    std::cerr<<(breakpoints.empty()?"TRACE ":"BREAK ")<<pc<<" opcode="<<static_cast<unsigned>(instruction.op)<<"\n";
+  };
+  const int status=taviq::VM{}.run(bytecode,std::cout,error,1000000,trace);
+  if(status){std::cerr<<error<<'\n';return 1;}
+  return 0;
+ }
+ return taviq::VM{}.run(bytecode,std::cout,error)?(std::cerr<<error<<'\n',1):0;
 }

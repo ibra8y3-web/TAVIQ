@@ -5,7 +5,7 @@
 #include <variant>
 #include <vector>
 namespace taviq {
-int VM::run(const Bytecode& b,std::ostream& output,std::string& error,std::size_t budget)const{
+int VM::run(const Bytecode& b,std::ostream& output,std::string& error,std::size_t budget,const TraceCallback& trace)const{
  error.clear();if(!verifyBytecode(b,error))return 1;
  using Value=std::variant<double,std::string,bool>;
  std::vector<Value> stack;std::vector<Value> locals(b.locals.size());
@@ -17,6 +17,7 @@ int VM::run(const Bytecode& b,std::ostream& output,std::string& error,std::size_
  while(pc<b.code.size()){
   if(steps++>=budget)return fail("QVM execution instruction budget exceeded");
   const auto& x=b.code[pc];bool advancePc=true;
+  if(trace){try{trace(pc,x);}catch(const std::exception& ex){return fail(std::string("QVM trace callback failed: ")+ex.what());}catch(...){return fail("QVM trace callback failed");}}
   switch(x.op){
    case OpCode::PushNumber:
     if(!std::isfinite(x.number))return fail("QVM invalid non-finite number");
