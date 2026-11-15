@@ -222,6 +222,7 @@ bool emitStatements(const std::vector<Statement>& statements,Context& c,
 }
 }
 bool emitC(const Program& program,std::string& output,std::vector<std::string>& errors){
+ if(!program.functions.empty()){errors.push_back("native C backend does not yet lower user-defined functions");return false;}
  Context context;
  if(!emitStatements(program.statements,context,1,false)||!context.errors.empty()){
   errors.insert(errors.end(),context.errors.begin(),context.errors.end());return false;

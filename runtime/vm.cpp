@@ -13,7 +13,7 @@ int VM::run(const Bytecode& bytecode,std::ostream& output,std::string& error,
     struct Frame {
         bool main{false};
         std::size_t functionIndex{};
-        std::size_t pc{},end{},returnAddress{},stackBase{};
+        std::size_t start{},pc{},end{},returnAddress{},stackBase{};
         std::vector<Value> locals;
         std::vector<bool> initialized,mutableLocals;
     };
@@ -27,6 +27,7 @@ int VM::run(const Bytecode& bytecode,std::ostream& output,std::string& error,
     std::vector<Frame> frames;
     Frame mainFrame;
     mainFrame.main=true;
+    mainFrame.start=0;
     mainFrame.end=bytecode.formatVersion==3?bytecode.mainEnd:bytecode.code.size();
     mainFrame.locals.resize(bytecode.locals.size());
     mainFrame.initialized.resize(bytecode.locals.size(),false);
@@ -214,7 +215,7 @@ int VM::run(const Bytecode& bytecode,std::ostream& output,std::string& error,
                 break;
             }
             case OpCode::Jump:
-                if(ins.slot<frames[frameIndex].pc||ins.slot>=frames[frameIndex].end)
+                if(ins.slot<frames[frameIndex].start||ins.slot>=frames[frameIndex].end)
                     return fail("QVM jump target is outside the current frame");
                 pc=ins.slot;advancePc=false;
                 break;
@@ -247,6 +248,7 @@ int VM::run(const Bytecode& bytecode,std::ostream& output,std::string& error,
                 Frame callee;
                 callee.main=false;
                 callee.functionIndex=ins.slot;
+                callee.start=function.entry;
                 callee.pc=function.entry;
                 callee.end=function.end;
                 callee.returnAddress=pc+1;

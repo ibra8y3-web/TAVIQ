@@ -9,6 +9,7 @@
 #include <string>
 int main(){
  taviq::Bytecode seed;
+ seed.formatVersion=3;seed.mainEnd=3;
  seed.code.push_back({taviq::OpCode::PushString,0,0,"TAVIQ fuzz seed"});
  seed.code.push_back({taviq::OpCode::Print,0,0,{}});
  seed.code.push_back({taviq::OpCode::Halt,0,0,{}});
