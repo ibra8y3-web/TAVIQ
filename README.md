@@ -15,6 +15,7 @@ TAVIQ is an evolving open-source programming-language and compute-runtime projec
 - Standalone typed SSA-like IR verifier and initial constant folding (not yet the default frontend lowering path).
 - Bounded managed heap with explicit roots (QVM values have not yet migrated to it).
 - Capability policy, bounded standard-library utilities, package-signature tooling, LSP diagnostics, Studio and Android JNI application foundations.
+- Package Manager resolves semantic-version constraints and transactionally installs the complete transitive dependency graph after HTTPS, SHA-256 and archive-path validation. It writes a reproducible taviq.lock resolution and never executes package installation scripts.
 - Explicit native AI/GPU provider loaders. Provider modules are trusted native code supplied separately; no AI model runtime or vendor Vulkan/CUDA/Metal accelerator provider is bundled.
 - Optional OpenCL provider (TAVIQ_ENABLE_OPENCL_PROVIDER=ON) executes real float32 vector addition on OpenCL GPU devices, with an OpenCL CPU fallback where a platform exposes no GPU device.
 
@@ -23,6 +24,14 @@ TAVIQ is an evolving open-source programming-language and compute-runtime projec
     cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
     cmake --build build --parallel
     ctest --test-dir build --output-on-failure
+
+## Package Manager
+
+    python tools/taviq_pkg.py install my-app --version 1.0.0 --index https://registry.example/index.json
+    python tools/taviq_pkg.py list
+    python tools/taviq_pkg.py remove my-app --version 1.0.0
+
+The install command resolves and installs all transitive dependencies as one staged transaction. Every archive must use HTTPS and match its registry SHA-256; unsafe archive paths and links are rejected. Package scripts are never executed. Signed registry verification can be required with the public-key and signature options exposed by the CLI.
 
 ## Optional OpenCL provider
 
