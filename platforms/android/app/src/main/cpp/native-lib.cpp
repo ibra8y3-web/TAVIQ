@@ -8,7 +8,7 @@
 #include <vector>
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_org_taviq_app_MainActivity_runTaviq(JNIEnv* env,jobject,jstring source) {
+Java_org_taviq_app_NativeRuntime_run(JNIEnv* env,jclass,jstring source) {
     if (!source) return env->NewStringUTF("Error: source is null");
     const char* utf=env->GetStringUTFChars(source,nullptr);
     if (!utf) return env->NewStringUTF("Error: unable to read source text");
@@ -22,23 +22,23 @@ Java_org_taviq_app_MainActivity_runTaviq(JNIEnv* env,jobject,jstring source) {
         const auto tokens=lexer.scan();
         if (!lexer.errors().empty()) {
             for (const auto& error:lexer.errors()) output<<error<<'\n';
-            return env->NewStringUTF(output.str().c_str());
+        } else {
+            taviq::Parser parser(tokens);
+            const auto program=parser.parse();
+            if (!parser.errors().empty()) {
+                for (const auto& error:parser.errors()) output<<error<<'\n';
+            } else {
+                taviq::Bytecode bytecode;
+                std::vector<std::string> errors;
+                if (!taviq::compile(program,bytecode,errors)) {
+                    for (const auto& error:errors) output<<error<<'\n';
+                } else {
+                    std::string runtimeError;
+                    if (taviq::VM{}.run(bytecode,output,runtimeError)!=0)
+                        output<<"Runtime error: "<<runtimeError<<'\n';
+                }
+            }
         }
-        taviq::Parser parser(tokens);
-        const auto program=parser.parse();
-        if (!parser.errors().empty()) {
-            for (const auto& error:parser.errors()) output<<error<<'\n';
-            return env->NewStringUTF(output.str().c_str());
-        }
-        taviq::Bytecode bytecode;
-        std::vector<std::string> errors;
-        if (!taviq::compile(program,bytecode,errors)) {
-            for (const auto& error:errors) output<<error<<'\n';
-            return env->NewStringUTF(output.str().c_str());
-        }
-        std::string runtimeError;
-        if (taviq::VM{}.run(bytecode,output,runtimeError)!=0)
-            output<<"Runtime error: "<<runtimeError<<'\n';
     } catch (const std::exception& ex) {
         output<<"Native exception: "<<ex.what()<<'\n';
     } catch (...) {

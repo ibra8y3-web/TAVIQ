@@ -13,8 +13,9 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.4.0"
+        testInstrumentationRunner = "android.test.InstrumentationTestRunner"
         ndk {
-            abiFilters += listOf("arm64-v8a")
+            abiFilters += listOf("arm64-v8a", "x86_64")
         }
         externalNativeBuild {
             cmake {

@@ -82,6 +82,13 @@ jobs:
           gradle-version: "9.9.1"
       - name: Build Android APK with JNI runtime
         run: gradle -p platforms/android --no-daemon :app:assembleDebug
+      - name: Run TAVIQ instrumentation tests on an Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          script: gradle -p platforms/android --no-daemon :app:connectedDebugAndroidTest
       - uses: actions/upload-artifact@v7
         with:
           name: taviq-android-debug-arm64
