@@ -5,6 +5,15 @@
 extern "C" {
 #endif
 #define TAVIQ_COMPUTE_ABI_VERSION 1u
+
+#if defined(_WIN32) && defined(TAVIQ_COMPUTE_PROVIDER_BUILD)
+#define TAVIQ_COMPUTE_EXPORT __declspec(dllexport)
+#elif defined(_WIN32)
+#define TAVIQ_COMPUTE_EXPORT __declspec(dllimport)
+#else
+#define TAVIQ_COMPUTE_EXPORT __attribute__((visibility("default")))
+#endif
+
 /* Provider functions return zero on success and non-zero on failure. */
 typedef struct taviq_compute_device_v1 {
     const char* name;
@@ -20,8 +29,9 @@ typedef struct taviq_gpu_provider_v1 {
                           float* output, size_t count);
     void (*shutdown)(void); /* optional */
 } taviq_gpu_provider_v1;
-/* Export this entry point from a provider dynamic library. */
-const taviq_gpu_provider_v1* taviq_compute_provider_entry_v1(void);
+
+/* Providers define TAVIQ_COMPUTE_PROVIDER_BUILD while compiling their module. */
+TAVIQ_COMPUTE_EXPORT const taviq_gpu_provider_v1* taviq_compute_provider_entry_v1(void);
 #ifdef __cplusplus
 }
 #endif

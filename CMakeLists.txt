@@ -36,6 +36,7 @@ add_test(NAME taviq_unit_tests COMMAND taviq_tests)
 
 add_library(taviq_test_compute_provider MODULE tests/fixtures/compute_provider.cpp)
 target_include_directories(taviq_test_compute_provider PRIVATE include)
+target_compile_definitions(taviq_test_compute_provider PRIVATE TAVIQ_COMPUTE_PROVIDER_BUILD)
 set_target_properties(taviq_test_compute_provider PROPERTIES PREFIX "")
 add_executable(taviq_gpu_provider_tests tests/unit/gpu_provider_tests.cpp)
 target_link_libraries(taviq_gpu_provider_tests PRIVATE taviq_core)
