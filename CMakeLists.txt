@@ -19,7 +19,10 @@ add_library(taviq_core
     compute/gpu_provider.cpp
 )
 target_include_directories(taviq_core PUBLIC include)
-target_link_libraries(taviq_core PUBLIC Threads::Threads \${CMAKE_DL_LIBS})
+target_link_libraries(taviq_core PUBLIC Threads::Threads)
+if(UNIX AND NOT APPLE)
+    target_link_libraries(taviq_core PUBLIC dl)
+endif()
 if(MSVC)
     target_compile_options(taviq_core PRIVATE /W4 /permissive-)
 else()
@@ -48,12 +51,12 @@ add_test(NAME taviq_gpu_provider_tests COMMAND taviq_gpu_provider_tests)
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
     add_test(NAME taviq_cli_integration
-        COMMAND \${Python3_EXECUTABLE}
-                \${CMAKE_CURRENT_SOURCE_DIR}/tests/python/test_cli.py
+        COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/python/test_cli.py
                 $<TARGET_FILE:taviq>
-                "\${CMAKE_C_COMPILER}")
+                "${CMAKE_C_COMPILER}")
     add_test(NAME taviq_python_tool_tests
-        COMMAND \${Python3_EXECUTABLE} -m unittest discover -s \${CMAKE_CURRENT_SOURCE_DIR}/tests/python -v)
+        COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_CURRENT_SOURCE_DIR}/tests/python -v)
 endif()
 
 install(TARGETS taviq RUNTIME DESTINATION bin)
