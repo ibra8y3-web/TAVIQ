@@ -38,11 +38,11 @@ int main() {
         "  display \"hello \" + \"TAVIQ\";\n"
         "}\n";
     auto program=parse(source);
-    taviq::Bytecode code; std::vector<std::string> errors;
+    taviq::Bytecode code; std::vector<std::string> errors; std::string error;
     CHECK(taviq::compile(program,code,errors));
     CHECK(errors.empty());
-    CHECK(taviq::verifyBytecode(code,errors));
-    std::ostringstream output; std::string error;
+    CHECK(taviq::verifyBytecode(code,error));
+    std::ostringstream output;
     CHECK(taviq::VM{}.run(code,output,error)==0);
     CHECK(output.str()=="14\n25\nhello TAVIQ\n");
 
