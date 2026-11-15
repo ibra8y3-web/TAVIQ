@@ -2,14 +2,18 @@
 
 ## Current safeguards
 
-- The QVM checks local-slot bounds, uninitialized locals, stack underflow, instruction budgets and arithmetic errors.
-- The QVM file reader validates its version, opcode range, section counts and string sizes before allocation.
-- AI model installation resolves a repository ref to an immutable commit, restricts file formats, requires a user license acknowledgement and verifies SHA-256 when Hub LFS metadata supplies it.
-- Package installation requires HTTPS, a registry-provided SHA-256, rejects traversal paths and links/special archive members, limits archive/unpacked sizes, and never runs install scripts.
-- Studio binds only to 127.0.0.1, rejects foreign browser origins, limits request sizes and uses subprocess argument arrays rather than a shell.
+- QVM v1/v2/v3 loading validates version, opcode ranges, instruction/function ranges, stack/type flow, local initialization, call signatures and terminal instructions before execution.
+- Runtime enforces instruction, stack, live-string, active-local and recursive call-depth limits.
+- AI Hub pins model assets to an immutable repository revision, requires explicit license acknowledgement, restricts file formats and verifies SHA-256 when Hub LFS metadata supplies it.
+- Package installation uses HTTPS, checks archive SHA-256, supports optional Ed25519-signed registry-index verification, rejects traversal and archive links/special files, limits extraction size and never executes install scripts.
+- Studio binds to loopback, restricts browser origins, bounds request sizes and invokes subprocesses without a shell.
+- Capability primitives define file/network/process/provider permission flags, workspace path checks and instruction budgets.
+- \`tools/taviq_sandbox.py\` is a fail-closed Linux Bubblewrap launcher. It refuses to run when Bubblewrap is unavailable, creates namespaces, denies networking by default and supports a read-only workspace mode.
 
 ## Explicit limitations
 
-The VM is not a process sandbox. No OS-level seccomp, AppContainer, Seatbelt or Android isolated-process policy is applied. Native C output executes with the caller's privileges. Third-party model runtimes and provider plugins are native code and must be trusted and separately reviewed. The Python model downloader does not execute repository scripts, but model parsing still belongs in a hardened inference runtime.
+The capability policy is not yet wired into every QVM operation. Bubblewrap is an external Linux process launcher, not a portable VM sandbox. There are no equivalent Windows AppContainer, macOS Seatbelt or Android isolated-process adapters in this release. Path-based checks cannot by themselves eliminate every filesystem TOCTOU race.
 
-Do not run untrusted native output or plugins. Do not expose the local Studio or llama.cpp endpoint to untrusted networks. A future release must add an independent bytecode verifier, fuzzing, OS sandbox integration, signed package metadata and supply-chain pinning.
+Native C output and AI/GPU provider plugins execute native code with the caller's privileges. Provider libraries must be trusted and separately reviewed; the dynamic ABI does not isolate them. Model parsing still belongs in a hardened inference runtime.
+
+Do not run untrusted native output or provider plugins. Do not expose Studio or a local llama.cpp endpoint to untrusted networks. OS sandbox integration, capability enforcement throughout the VM, signed provider provenance and broader adversarial fuzzing remain outstanding.

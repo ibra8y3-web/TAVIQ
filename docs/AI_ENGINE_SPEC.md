@@ -1,11 +1,16 @@
 # TAVIQ Intelligence Engine — Implementation Boundary
 
-The repository currently provides three separate pieces:
+## Implemented provider host
 
-1. A C ABI contract in ai/providers/taviq_provider.h for future native provider modules.
-2. tools/taviq_hub.py to fetch model/tokenizer assets from Hugging Face at an immutable revision.
-3. ai/taviq_ai.py to call a separately managed llama.cpp server over HTTP, loopback by default.
+- \`include/taviq/ai_provider.h\` defines ABI v1: provider metadata, initialization, single-prompt generation, response release and shutdown.
+- \`ai/ai_provider.cpp\` implements a cross-platform dynamic-library loader. It validates ABI version and callbacks, bounds configuration and prompt sizes, caps generation tokens and temperature, and releases provider-owned responses.
+- \`taviq ai-generate <provider-library> <prompt> [tokens] [temperature]\` loads a trusted provider and invokes generation.
+- \`tests/fixtures/ai_provider.cpp\` is a contract fixture for ABI tests, not an inference model.
 
-These pieces are not yet unified into an in-process inference engine or language-level AI syntax. The Python client does not install llama.cpp automatically. The model hub does not execute downloaded code. The native ABI is not dynamically loaded by the C++ runtime.
+## Separate model workflow
 
-The target API includes model load/unload, prompt generation, cancellation, streaming, embeddings, tokenizer access, usage metrics and resource limits. Native ABI loader, streaming, embeddings, model lifecycle and TAVIQ-language integration remain unimplemented.
+\`tools/taviq_hub.py\` downloads model/tokenizer assets from Hugging Face at an immutable revision after license acknowledgement. \`ai/taviq_ai.py\` remains a separate HTTP client for a separately installed llama.cpp server.
+
+## What is not included
+
+The repository does not bundle model weights, llama.cpp, an in-process inference engine, tokenizer runtime, GPU kernels or a production AI provider. The native provider ABI is a trusted native-code extension point and is not a sandbox. The current ABI exposes one-shot generation only; streaming, embeddings, cancellation, batching, model discovery/installation integration, usage accounting and language-level AI syntax remain outstanding.

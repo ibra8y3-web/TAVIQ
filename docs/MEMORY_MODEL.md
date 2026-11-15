@@ -1,22 +1,24 @@
 # TAVIQ Runtime Memory Model
 
-## QVM v2 values
+## QVM frames
 
-The VM currently stores value-owned double, UTF-8 std::string and Boolean values. let locals are immutable; var locals use a mutable slot. Local values are released through C++ value lifetime. There is no user-visible pointer type, manual allocator or garbage collector yet.
+QVM v3 stores runtime values as value-owned \`double\`, UTF-8 \`std::string\` and Boolean values. The main flow has its own locals; each function call allocates a separate frame with parameter/local slots, initialization and mutability state, operand-stack base and return address. Recursive calls are supported with a maximum call-depth limit. Returning destroys the callee frame and transfers one return value to the caller.
 
-## Verifier memory model
+\`let\` slots are immutable after initialization. \`var\` slots may be reassigned without changing type. QVM v1/v2 bytecode remains readable; new source is compiled to QVM v3.
 
-The verifier performs control-flow dataflow over the QVM v2 instruction graph. Each abstract state tracks operand stack types, local initialization/mutability and string byte counts. At branch merges it requires compatible stack shapes and conservatively combines local and string states. Unbounded or varying loop-carried strings are rejected rather than assumed safe.
+## Managed heap component
 
-Limits:
-- 1,000,000 instructions and 65,536 locals/operand-stack entries.
-- 1 MiB per encoded string or local identifier.
-- 16 MiB aggregate encoded names and instruction strings.
-- 16 MiB estimated live string values including locals and stack copies.
-- Runtime instruction budget counts executed steps, so an infinite loop terminates with a budget error.
+\`include/taviq/heap.hpp\` and \`memory/heap.cpp\` provide a separate bounded object heap with String/Array/Record objects, explicit RAII root handles and mark/sweep collection. It validates references, tracks configured byte/object limits and exposes inspection/collection APIs.
 
-These limits are verifier/runtime bounds, not a promise that every host can allocate the maximum. Allocation failures remain possible and must be handled by embedding applications.
+**Integration boundary:** QVM's current number/string/Boolean values and function frames do not yet use this managed heap. Source-language arrays/records, object references, ownership/borrowing and automatic GC integration are not implemented. The heap is a reusable runtime component, not a claim that all TAVIQ allocations are garbage-collected.
 
-## Deferred memory design
+## Runtime limits
 
-A future managed runtime must specify object headers, allocation arenas, tracing or reference-counting policy, cycle behavior, deterministic finalization, thread ownership and FFI lifetimes before exposing heap objects to user programs. No garbage collector is claimed by the current implementation.
+- QVM instruction budget defaults to 1,000,000 executed instructions.
+- Operand stack is bounded to 65,536 values.
+- Function recursion is limited to 256 active frames.
+- Active function/main local slots are bounded to 1,000,000 total.
+- Estimated live QVM strings are bounded to 16 MiB.
+- Encoded bytecode strings are limited to 1 MiB each and 16 MiB in aggregate.
+
+These limits are protective ceilings, not a promise that every host can allocate the maximum. Allocation failures remain possible and are surfaced as runtime errors where handled.
