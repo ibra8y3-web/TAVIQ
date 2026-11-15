@@ -1,21 +1,39 @@
 # TAVIQ GPU Provider Host
 
-TAVIQ ships a host-side dynamic provider loader. An application or the CLI can explicitly load a provider module, inspect its ABI version and device list, and invoke the version-1 float32 vector-add operation.
+TAVIQ ships a host-side dynamic provider loader and an optional OpenCL implementation. The host ABI can enumerate devices and execute float32 vector addition through a trusted native provider.
 
 ## Provider ABI
 
-A shared library exports taviq_compute_provider_entry_v1 and returns a pointer to a static taviq_gpu_provider_v1 table. ABI version must equal TAVIQ_COMPUTE_ABI_VERSION. Required callbacks are device_count, device_info and vector_add_f32. shutdown is optional and is called before unloading.
+A shared library exports taviq_compute_provider_entry_v1 and returns a pointer to a static taviq_gpu_provider_v1 table. ABI version must equal TAVIQ_COMPUTE_ABI_VERSION. Required callbacks are device_count, device_info and vector_add_f32; shutdown is optional.
 
-On Windows, provider modules must define TAVIQ_COMPUTE_PROVIDER_BUILD when compiling so the entry point is exported from the DLL. On POSIX platforms, the ABI header marks the entry point with default symbol visibility.
+The host validates provider ABI metadata and bounds vector length. Provider code is native code and executes with the host process privileges. Load only libraries from a trusted source.
 
-Provider operations return zero on success and non-zero on failure. Provider code is native code and is trusted: only load modules obtained from a trusted source. TAVIQ does not download, discover or execute provider libraries automatically.
+## OpenCL provider
+
+The optional module in compute/opencl_provider.cpp implements the existing ABI with actual OpenCL commands:
+
+- Enumerates OpenCL GPU devices where available.
+- Uses an OpenCL CPU device only as a reported fallback when a platform has no GPU device.
+- Creates an OpenCL context, command queue, program, kernel and bounded input/output buffers for each vector-add operation.
+- Releases OpenCL resources on success and failure.
+- Limits each vector to 16 million float32 values.
+
+OpenCL is optional and is not built into the default CLI or Android NDK build. Enable it with:
+
+    cmake -S . -B build-opencl -DTAVIQ_ENABLE_OPENCL_PROVIDER=ON
+    cmake --build build-opencl --parallel
+
+On Debian/Ubuntu, install ocl-icd-opencl-dev and an ICD implementation/driver first. The module is linked to the host OpenCL loader; a compatible runtime/driver must also be installed where it is used.
 
 ## CLI
 
-    build/taviq gpu-info /absolute/path/to/provider-library
+    build/taviq gpu-info /path/to/taviq_opencl_provider.so
+    build/taviq gpu-add /path/to/taviq_opencl_provider.so 0 1,2,3 4,5,6
 
-The loader supports Windows LoadLibrary, POSIX dlopen platforms including Linux/macOS, and Android's dynamic linker. The project does not bundle a production Vulkan, CUDA or Metal provider yet.
+The second command invokes the provider's vector-add callback and prints the resulting comma-separated values. On a CPU fallback it is OpenCL compute, not hardware GPU acceleration.
 
-## Contract tests
+## Validation
 
-CI builds a test-only ABI fixture module and loads it through the same dynamic loader on host test runners. This validates the module boundary, ABI negotiation, metadata copying, error paths and vector-add call. It is not a hardware acceleration test.
+The optional integration test dynamically loads the built module and exercises vector addition on an available OpenCL device. If no OpenCL device is exposed, it reports a skip; CI installs POCL so that a real OpenCL CPU device can exercise the kernel. The existing ABI fixture test remains a separate host-contract test and is not represented as GPU hardware validation.
+
+Production Vulkan, CUDA and Metal providers, physical GPU validation on user hardware, device-specific performance tests and GPU memory planning remain outstanding.
