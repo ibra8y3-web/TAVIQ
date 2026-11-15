@@ -38,7 +38,11 @@ add_test(NAME taviq_unit_tests COMMAND taviq_tests)
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
     add_test(NAME taviq_cli_integration
-        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/python/test_cli.py $<TARGET_FILE:taviq>)
+        COMMAND ${Python3_EXECUTABLE}
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/python/test_cli.py
+                $<TARGET_FILE:taviq>
+                "${CMAKE_C_COMPILER}"
+                "${CMAKE_C_COMPILER_ID}")
     add_test(NAME taviq_python_tool_tests
         COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_CURRENT_SOURCE_DIR}/tests/python -v)
 endif()
