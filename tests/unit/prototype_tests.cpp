@@ -62,6 +62,8 @@ int main(){
  CHECK(generatedC.find("sqrt(")!=std::string::npos);CHECK(generatedC.find("strlen(")!=std::string::npos);
  const auto unsupportedNative=parse("flow main { if (true) { display 1; } }");
  CHECK(!taviq::emitC(unsupportedNative,generatedC,nativeErrors));
+ const auto mismatchedNative=parse("flow main { let label: string=1; }");
+ CHECK(!taviq::emitC(mismatchedNative,generatedC,nativeErrors));nativeErrors.clear();
 
  std::vector<std::string> errors;taviq::Bytecode bad;
  CHECK(!taviq::compile(parse("flow main { let fixed: number=1; fixed=2; }"),bad,errors));errors.clear();
