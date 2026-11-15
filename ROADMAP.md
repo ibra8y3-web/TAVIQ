@@ -6,7 +6,7 @@ Status reflects code and CI evidence on the default branch, not directory names 
 |---|---|---|---|
 | 01 | Foundation/build | implemented | signed reproducible releases |
 | 02 | Frontend | implemented - expanded subset | user-defined functions, parameters, returns, imports/modules, arrays, structs and Unicode identifiers |
-| 03 | Type system | implemented - number/string/Boolean subset | explicit types, structs, generics, inference and richer diagnostics |
+| 03 | Type system | implemented - inferred and explicit number/string/bool | user-defined types, structs, generics, interfaces, union types and richer diagnostics |
 | 04 | IR | implemented - QVM instruction IR | standalone SSA IR and optimization passes |
 | 05 | QVM | implemented - v2 CFG verifier and v1 loader | coverage-guided fuzzing, source maps, calls/closures and richer opcodes |
 | 06 | Native backend | implemented - C lowering subset | LLVM backend, optimization and control-flow lowering |

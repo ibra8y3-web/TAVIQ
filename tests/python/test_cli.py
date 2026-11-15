@@ -33,6 +33,17 @@ def main():
         assert "LENGTH" in run([sys.executable, str(dev), "inspect", str(source), "--compiler", str(binary)], root).stdout
         assert "profile runs=3" in run([sys.executable, str(dev), "profile", str(source), "--compiler", str(binary), "--runs", "3"], root).stdout
 
+        typed = root / "typed.taviq"
+        typed.write_text('flow main { let count:number=3; var label:string="ready"; var active:bool=true; display count; display label; display active; }\\n', encoding="utf-8")
+        assert run([str(binary), "run", str(typed)], root).stdout == "3\\nready\\ntrue\\n"
+        run([sys.executable, str(dev), "format", str(typed)], root)
+        run([sys.executable, str(dev), "format", "--check", str(typed)], root)
+        run([sys.executable, str(dev), "lint", str(typed), "--compiler", str(binary)], root)
+
+        invalid_type = root / "invalid-type.taviq"
+        invalid_type.write_text('flow main { let count:number="bad"; }\\n', encoding="utf-8")
+        run([str(binary), "check", str(invalid_type)], root, expect=1)
+
         structured = root / "structured.taviq"
         structured.write_text(
             'flow main { var n=0; while(n<3){ n=n+1; if(n==2){display true;}else{display false;} } }\n',

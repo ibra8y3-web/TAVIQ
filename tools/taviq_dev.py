@@ -11,7 +11,7 @@ import time
 
 TOKEN = re.compile(
     r'"(?:\\.|[^"\\])*"|==|!=|<=|>=|'
-    r'[A-Za-z_][A-Za-z0-9_]*|(?:\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|[{}();,+*/=!<>-]'
+    r'[A-Za-z_][A-Za-z0-9_]*|(?:\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|[{}();,:+*/=!<>-]'
 )
 BINARY_OPERATORS = {"=", "==", "!=", "<", "<=", ">", ">=", "+", "-", "*", "/", "and", "or"}
 
@@ -91,12 +91,14 @@ def format_source(source):
             current = ""
         elif token == ",":
             current = current.rstrip() + ", "
+        elif token == ":":
+            current = current.rstrip() + ": "
         elif token in BINARY_OPERATORS:
             current = current.rstrip() + " " + token + " "
         elif token == "!":
             current = current.rstrip() + "!"
         else:
-            if current and previous not in {"(", ",", "!", *BINARY_OPERATORS}:
+            if current and previous not in {"(", ",", ":", "!", *BINARY_OPERATORS}:
                 current += " "
             current += token
 
