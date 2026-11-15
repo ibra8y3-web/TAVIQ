@@ -78,3 +78,8 @@ endif()
 install(TARGETS taviq RUNTIME DESTINATION bin)
 install(TARGETS taviq_core ARCHIVE DESTINATION lib LIBRARY DESTINATION lib RUNTIME DESTINATION bin)
 install(DIRECTORY include/taviq DESTINATION include)
+
+if(ANDROID)
+    add_library(taviq_android SHARED platforms/android/app/src/main/cpp/native-lib.cpp)
+    target_link_libraries(taviq_android PRIVATE taviq_core log)
+endif()
