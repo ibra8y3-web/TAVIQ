@@ -1,17 +1,29 @@
-# TAVIQ QVM Bytecode v1
+# QVM Bytecode Format v1
 
-## Container format
+QVM v1 is a little-endian, version-tagged bytecode container. Its magic is TVQVM01 followed by a zero byte.
 
-The binary begins with the eight-byte signature TVQVM01 followed by little-endian 32-bit instruction and local-table counts. Local names are length-prefixed UTF-8 strings. Each instruction stores an opcode byte, a 32-bit local slot, a 64-bit IEEE-754 number field, and a length-prefixed UTF-8 text field. Unused operands are serialized as zero/empty values.
+## Container layout
 
-The loader rejects unknown versions/opcodes, excessive section counts, oversized strings and truncated sections.
+1. 8-byte magic/version.
+2. 32-bit instruction count.
+3. 32-bit local-name count.
+4. Each local name: 32-bit byte length followed by UTF-8 bytes.
+5. Each instruction: 8-bit opcode, 32-bit slot, 64-bit IEEE-754 operand bits, 32-bit text length and text bytes.
 
-## Initial instruction set
+## Supported opcodes
 
-PUSH_NUMBER, PUSH_STRING, LOAD_LOCAL, STORE_LOCAL, ADD, SUB, MUL, DIV, NEG, PRINT, HALT.
+PUSH_NUMBER, PUSH_STRING, LOAD_LOCAL, STORE_LOCAL, ADD, SUB, MUL, DIV, NEG, PRINT, HALT, LENGTH, SQRT and ABS.
 
-The command taviq compile input.taviq -o output.tvqbc emits the container. taviq run-bytecode loads and executes it. taviq disasm prints a human-readable listing.
+## Verification
 
-## Safety
+The loader, serializer and VM entry point call the same verifier. It rejects unknown opcodes, non-finite constants, type-invalid operations, stack underflow, invalid/uninitialized locals, duplicate local initialization, non-final HALT, non-empty stack at HALT, oversized encoded payloads and live string usage above 16 MiB. Serialized input with bytes after the final instruction is rejected.
 
-The VM has an instruction budget, stack limit, local-slot validation, initialization checks, division-by-zero checks and output-stream error handling. A separate static bytecode verifier, fuzzing campaign and OS sandbox are still required before treating bytecode as safe for hostile multi-tenant execution.
+The verifier assumes straight-line bytecode. Control flow or function-call opcodes require a control-flow graph verifier with dataflow joins; do not extend the instruction set with jumps before that exists.
+
+## Limits
+
+- 1,000,000 instructions.
+- 65,536 locals and operand-stack entries.
+- 1 MiB per encoded string.
+- 16 MiB aggregate encoded strings.
+- 16 MiB live string memory estimated for the straight-line program.

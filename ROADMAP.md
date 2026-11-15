@@ -1,24 +1,24 @@
 # TAVIQ Engineering Roadmap
 
-Status is based on code and automated checks in this repository, not on directory names or design documents.
+Status reflects the code merged into the default branch and completed CI evidence, not directory names or design documents.
 
-| Stage | Scope | Current status | Evidence / remaining work |
+| Stage | Scope | Current status | Remaining work |
 |---|---|---|---|
-| 01 | Foundation and build system | implemented | CMake, CI, license, repository policy |
-| 02 | Lexer, parser, AST | implemented - subset | flow main, let, expressions, strings, diagnostics; functions/control flow/modules remain |
-| 03 | Type checking | implemented - subset | numeric/string expression checks, duplicate and undefined-name checks; full type system/generics remain |
-| 04 | Intermediate representation | implemented - QVM instruction IR | AST lowers to typed instruction sequence; separate SSA IR and optimization passes remain |
-| 05 | QVM bytecode/runtime | implemented - v1 | versioned binary format, serialization, disassembly, stack/type/local verifier and bounded execution; fuzzing remains |
-| 06 | Native backend | implemented - C lowering subset | emits portable C for numeric expressions and string literals; LLVM backend and broader lowering remain |
-| 07 | Core runtime | in progress | VM values, locals, stack/instruction limits; memory manager, GC/ownership and OS abstractions remain |
-| 08 | AI engine | in progress | llama.cpp loopback HTTP client and provider ABI; native provider loader, streaming and embeddings remain |
-| 09 | Compute engine | in progress | CPU parallel-for; SIMD and actual Vulkan/CUDA/Metal providers remain |
-| 10 | Security | in progress | verified QVM, safe model/package handling, loopback Studio; OS sandbox and capability enforcement remain |
-| 11 | Standard library | not started | language-level modules and stable APIs remain |
-| 12 | Package ecosystem | implemented - local registry flow | HTTPS index, pinned SHA-256 archives, safe extraction, lock file; public registry/signatures remain |
-| 13 | Developer tools | in progress | CLI run/check/compile/disasm, package and model tools; formatter, debugger and profiler remain |
-| 14 | Cross-platform | in progress | CI builds Linux/Windows/macOS and cross-builds Android arm64; physical-device runtime validation remains |
-| 15 | TAVIQ Studio | implemented - initial local editor | loopback browser editor, save/run; language services, breakpoints and project explorer remain |
-| 16 | Release engineering | in progress | CI test matrix and artifacts; signed release process and reproducible builds remain |
+| 01 | Foundation/build | implemented | signed reproducible releases |
+| 02 | Frontend | implemented - subset | user functions, conditionals, loops, modules and Unicode identifiers |
+| 03 | Type system | implemented - subset | booleans, user types, generics, inference and richer diagnostics |
+| 04 | IR | implemented - QVM instruction IR | standalone SSA IR and optimization passes |
+| 05 | QVM | implemented - v1 verified subset | fuzzing, broader instruction set and verified control-flow graphs |
+| 06 | Native backend | implemented - C lowering subset | LLVM backend and broader language lowering |
+| 07 | Runtime | in progress | managed memory, ownership model, OS abstraction and structured concurrency |
+| 08 | AI | in progress | native provider loader, streamed tokens, embeddings and model lifecycle APIs |
+| 09 | Compute | in progress | SIMD plus real Vulkan/CUDA/Metal providers and device validation |
+| 10 | Security | in progress | OS sandbox, capability enforcement and hardened plugin isolation |
+| 11 | Standard library | implemented - initial intrinsics | collections, IO, filesystem, networking, time, async and AI modules |
+| 12 | Packages | implemented - local registry flow | public registry, signatures, dependency solving and lockfile verification |
+| 13 | Developer tools | implemented - initial CLI set | LSP, full debugger, source maps and sampling profiler |
+| 14 | Platforms | implemented - CI builds | Android runtime/device validation and platform-specific packaging |
+| 15 | Studio | implemented - initial loopback editor | language services, project model, breakpoints and integrated debugger |
+| 16 | Release engineering | in progress | signed binaries, reproducible builds, SBOM and automated release promotion |
 
-A stage must not be marked complete merely because its directory or specification exists. Hardware-dependent features require provider implementation and real-device testing before they can be promoted.
+The QVM verifier enforces stack typing, one-time local initialization, encoded-string bounds and a 16 MiB live-string budget. It is still a straight-line bytecode verifier; control-flow instructions must not be added without a control-flow-aware dataflow verifier.
