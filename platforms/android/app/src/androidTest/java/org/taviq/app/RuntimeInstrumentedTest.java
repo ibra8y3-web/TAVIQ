@@ -3,10 +3,12 @@ package org.taviq.app;
 import android.test.InstrumentationTestCase;
 
 public final class RuntimeInstrumentedTest extends InstrumentationTestCase {
-    public void testNativeCompilerAndQvmRunOnAndroid() {
+    public void testNativeCompilerAndQvmV3RecursiveCallOnAndroid() {
         final String source =
-                "flow main { var n: number = 6; display n * 7; display true; }";
-        assertEquals("42\ntrue\n", NativeRuntime.run(source));
+                "fn factorial(n: number) -> number { " +
+                "if (n <= 1) { return 1; } else { return n * factorial(n - 1); } } " +
+                "flow main { display factorial(6); display true; }";
+        assertEquals("720\ntrue\n", NativeRuntime.run(source));
     }
 
     public void testInvalidProgramReturnsDiagnostics() {

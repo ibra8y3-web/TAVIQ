@@ -55,8 +55,8 @@ public final class MainActivity extends Activity {
         root.addView(heading);
 
         TextView subtitle = new TextView(this);
-        subtitle.setText(text("Native C++ compiler · QVM v2",
-                              "مترجم C++ الأصلي · آلة QVM v2"));
+        subtitle.setText(text("Native C++ compiler · QVM v3",
+                              "مترجم C++ الأصلي · آلة QVM v3"));
         subtitle.setTextColor(0xffaab8cc);
         subtitle.setGravity(rtl ? Gravity.RIGHT : Gravity.LEFT);
         root.addView(subtitle);
@@ -77,14 +77,15 @@ public final class MainActivity extends Activity {
         source.setHintTextColor(0xff75839a);
         source.setHint(text("Write a TAVIQ flow...", "اكتب برنامج TAVIQ..."));
         source.setMinLines(12);
-        source.setText("flow main {\n" +
-                "    var total: number = 0;\n" +
-                "    var i: number = 0;\n" +
-                "    while (i < 5) {\n" +
-                "        i = i + 1;\n" +
-                "        total = total + i;\n" +
+        source.setText("fn factorial(n: number) -> number {\n" +
+                "    if (n <= 1) {\n" +
+                "        return 1;\n" +
+                "    } else {\n" +
+                "        return n * factorial(n - 1);\n" +
                 "    }\n" +
-                "    display total;\n" +
+                "}\n" +
+                "flow main {\n" +
+                "    display factorial(6);\n" +
                 "    display \"TAVIQ on Android\";\n" +
                 "}\n");
         root.addView(source, new LinearLayout.LayoutParams(
