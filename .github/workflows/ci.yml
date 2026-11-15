@@ -38,6 +38,22 @@ jobs:
             build/Release/taviq.exe
           if-no-files-found: ignore
 
+  opencl-provider:
+    name: Build and execute optional OpenCL provider
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install OpenCL development files and CPU ICD
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ocl-icd-opencl-dev pocl-opencl-icd
+      - name: Configure with OpenCL provider enabled
+        run: cmake -S . -B build-opencl -DCMAKE_BUILD_TYPE=Release -DTAVIQ_ENABLE_OPENCL_PROVIDER=ON
+      - name: Build
+        run: cmake --build build-opencl --config Release --parallel
+      - name: Run OpenCL provider integration test
+        run: ctest --test-dir build-opencl -C Release -R "taviq_opencl_provider_tests|taviq_gpu_cli_integration" --output-on-failure
+
   android-arm64:
     name: Android NDK cross-build (arm64-v8a)
     runs-on: ubuntu-latest
