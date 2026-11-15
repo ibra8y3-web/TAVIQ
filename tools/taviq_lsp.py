@@ -18,7 +18,7 @@ KEYWORDS = [
     ("not", "Boolean negation"), ("fn", "function declaration")
 ]
 BUILTINS = [
-    ("len", "len(string) -> number"), ("sqrt", "sqrt(number) -> number"),
+    ("len", "len(string) -> number"), ("sqrt", "sqrt(non-negative number) -> number"),
     ("abs", "abs(number) -> number")
 ]
 WORD = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")

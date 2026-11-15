@@ -19,7 +19,7 @@ class LspTests(unittest.TestCase):
         server.documents["file:///demo.taviq"]="flow main { display sqrt(9); }"
         answer=server.dispatch({"jsonrpc":"2.0","id":1,"method":"textDocument/hover",
           "params":{"textDocument":{"uri":"file:///demo.taviq"},"position":{"line":0,"character":24}}})
-        self.assertIn("square",answer["contents"]["value"].lower() if "square" in answer["contents"]["value"].lower() else "sqrt")
+        self.assertIn("sqrt(non-negative number)",answer["contents"]["value"])
     def test_diagnostics_without_compiler_are_non_fabricated(self):
         self.assertEqual(lsp.diagnostics_for("flow main {}",""),[])
 

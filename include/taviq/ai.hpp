@@ -2,6 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include "taviq/ai_provider.h"
 namespace taviq {
 struct AiResult { std::string text; };
 class AiProvider {
@@ -19,7 +20,7 @@ public:
     const std::string& name() const noexcept { return providerName_; }
 private:
     void* library_{nullptr};
-    const struct taviq_ai_provider_v1* api_{nullptr};
+    const ::taviq_ai_provider_v1* api_{nullptr};
     std::string providerName_;
 };
 }

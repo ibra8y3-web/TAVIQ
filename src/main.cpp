@@ -6,6 +6,7 @@
 #include "taviq/native.hpp"
 #include "taviq/parser.hpp"
 #include "taviq/vm.hpp"
+#include <algorithm>
 #include <fstream>
 #include <iostream>
 #include <sstream>

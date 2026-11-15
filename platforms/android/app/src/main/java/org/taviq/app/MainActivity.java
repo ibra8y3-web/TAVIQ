@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.os.Bundle;
 import android.graphics.Typeface;
 import android.view.View;
+import android.view.Gravity;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
@@ -36,13 +37,13 @@ public final class MainActivity extends Activity {
         root.addView(subtitle);
 
         source = new EditText(this);
-        source.setGravity(View.TEXT_ALIGNMENT_VIEW_START);
+        source.setGravity(Gravity.TOP | Gravity.START);
         source.setTypeface(Typeface.MONOSPACE);
         source.setTextColor(0xffe9f0fa);
         source.setHintTextColor(0xff75839a);
         source.setHint("Write a TAVIQ flow...");
         source.setMinLines(12);
-        source.setText("flow main {\\n    var total: number = 0;\\n    var i: number = 0;\\n    while (i < 5) {\\n        i = i + 1;\\n        total = total + i;\\n    }\\n    display total;\\n    display \\"TAVIQ on Android\\";\\n}\\n");
+        source.setText("flow main {\n    var total: number = 0;\n    var i: number = 0;\n    while (i < 5) {\n        i = i + 1;\n        total = total + i;\n    }\n    display total;\n    display \"TAVIQ on Android\";\n}\n");
         root.addView(source, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
 
