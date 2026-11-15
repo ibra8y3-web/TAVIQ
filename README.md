@@ -7,7 +7,7 @@ TAVIQ is an open-source programming-language project for AI-oriented and high-pe
 ## Working implementation
 
 - C++20 frontend with flow main, immutable let, mutable var, assignment, display, Boolean expressions, comparisons, if/else and while.
-- Lexical block scopes and static checks for supported number/string/Boolean types.
+- Lexical block scopes, inferred or explicitly annotated number/string/bool declarations, and static type mismatch diagnostics.
 - QVM v2 with conditional/unconditional jumps, CFG-aware verification, runtime instruction budgets and v1 bytecode loading compatibility.
 - Deterministic QVM/lexer/parser mutation tests.
 - C source lowering for the supported numeric subset; control flow is not yet lowered by the C backend.
@@ -25,8 +25,8 @@ TAVIQ is an open-source programming-language project for AI-oriented and high-pe
 ## Language example
 
     flow main {
-        var total = 0;
-        var index = 0;
+        var total: number = 0;
+        var index: number = 0;
 
         while (index < 5) {
             index = index + 1;

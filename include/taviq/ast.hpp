@@ -18,6 +18,7 @@ struct Statement {
     enum class Kind { Let, Var, Assign, Display, If, While };
     Kind kind{Kind::Display};
     std::string name;
+    std::string declaredType; // number, string or bool; empty means infer
     std::shared_ptr<Expr> expression;
     std::size_t line{};
     std::vector<Statement> body;

@@ -48,6 +48,7 @@ std::vector<Token> Lexer::scan(){
    case '{':add(TokenKind::LeftBrace,"{");break;case '}':add(TokenKind::RightBrace,"}");break;
    case '(':add(TokenKind::LeftParen,"(");break;case ')':add(TokenKind::RightParen,")");break;
    case ';':add(TokenKind::Semicolon,";");break;case ',':add(TokenKind::Comma,",");break;
+   case ':':add(TokenKind::Colon,":");break;
    case '=':{const bool eq=match('=');add(eq?TokenKind::EqualEqual:TokenKind::Equal,eq?"==":"=");break;}
    case '!':{const bool eq=match('=');add(eq?TokenKind::BangEqual:TokenKind::Bang,eq?"!=":"!");break;}
    case '<':{const bool eq=match('=');add(eq?TokenKind::LessEqual:TokenKind::Less,eq?"<=":"<");break;}

@@ -34,6 +34,10 @@ int main(){
  std::ostringstream arithmeticOut;CHECK(taviq::VM{}.run(arithmetic,arithmeticOut,error)==0);
  CHECK(arithmeticOut.str()=="14\n25\nhello TAVIQ\n5\n12\n");
 
+ const auto annotated=compileSource("flow main { let count: number=3; var label: string=\"ready\"; var active: bool=true; display count; display label; display active; }");
+ std::ostringstream annotatedOut;CHECK(taviq::VM{}.run(annotated,annotatedOut,error)==0);
+ CHECK(annotatedOut.str()=="3\nready\ntrue\n");
+
  const auto control=compileSource(
   "flow main { var total=0; var i=0; "
   "while (i < 5) { i=i+1; if (i == 3) { total=total+10; } else { total=total+i; } } "
@@ -58,9 +62,14 @@ int main(){
  CHECK(generatedC.find("sqrt(")!=std::string::npos);CHECK(generatedC.find("strlen(")!=std::string::npos);
  const auto unsupportedNative=parse("flow main { if (true) { display 1; } }");
  CHECK(!taviq::emitC(unsupportedNative,generatedC,nativeErrors));
+ const auto mismatchedNative=parse("flow main { let label: string=1; }");
+ CHECK(!taviq::emitC(mismatchedNative,generatedC,nativeErrors));nativeErrors.clear();
 
  std::vector<std::string> errors;taviq::Bytecode bad;
- CHECK(!taviq::compile(parse("flow main { let fixed=1; fixed=2; }"),bad,errors));errors.clear();
+ CHECK(!taviq::compile(parse("flow main { let fixed: number=1; fixed=2; }"),bad,errors));errors.clear();
+ CHECK(!taviq::compile(parse("flow main { let wrong: number=\"text\"; }"),bad,errors));errors.clear();
+ CHECK(!taviq::compile(parse("flow main { var wrong: bool=1; }"),bad,errors));errors.clear();
+ CHECK(!taviq::compile(parse("flow main { let unknown: integer=1; }"),bad,errors));errors.clear();
  CHECK(!taviq::compile(parse("flow main { var value=1; value=\"text\"; }"),bad,errors));errors.clear();
  CHECK(!taviq::compile(parse("flow main { if (1) { display 1; } }"),bad,errors));errors.clear();
  CHECK(!taviq::compile(parse("flow main { while (false) { let x=1; } }"),bad,errors));errors.clear();

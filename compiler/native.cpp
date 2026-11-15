@@ -66,6 +66,14 @@ bool emitC(const Program& p,std::string& output,std::vector<std::string>& errors
   if(s.kind==Statement::Kind::Let||s.kind==Statement::Kind::Var){
    if(vars.contains(s.name)){errors.push_back("duplicate variable: "+s.name);continue;}
    Type t;if(!getType(s.expression,types,t,errors))continue;
+   if(!s.declaredType.empty()){
+    Type annotated=Type::Number;
+    if(s.declaredType=="number")annotated=Type::Number;
+    else if(s.declaredType=="string")annotated=Type::String;
+    else if(s.declaredType=="bool")annotated=Type::Boolean;
+    else{errors.push_back("native C backend: unknown type annotation '"+s.declaredType+"'");continue;}
+    if(t!=annotated){errors.push_back("native C backend: initializer does not match declared type '"+s.declaredType+"'");continue;}
+   }
    if(t!=Type::Number){errors.push_back("native C backend currently lowers numeric variables only");continue;}
    std::string expr;if(!numeric(s.expression,vars,expr,errors))continue;
    const std::string name="taviq_v"+std::to_string(next++);
