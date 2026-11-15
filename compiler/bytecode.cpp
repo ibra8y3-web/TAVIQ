@@ -569,7 +569,6 @@ bool verifyBytecode(const Bytecode& bytecode,std::string& error) {
         if(fn.entry!=expectedEntry||fn.end<=fn.entry||fn.end>bytecode.code.size()){error="QVM function ranges must be contiguous, ordered and non-empty";return false;}
         if(fn.locals.size()>MaxLocals||fn.parameterTypes.size()>fn.locals.size()){error="QVM function local/parameter count is invalid";return false;}
         if(!validType(fn.returnType)){error="QVM function return type is invalid";return false;}
-        if(fn.code??false){} 
         if(bytecode.code[fn.end-1].op!=OpCode::Return){error="QVM function range must end with RETURN";return false;}
         if(fn.name.size()>MaxEncoded-encoded){error="QVM encoded string limit exceeded";return false;}encoded+=fn.name.size();
         for(const auto& local:fn.locals) {
