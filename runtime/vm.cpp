@@ -26,6 +26,9 @@ int VM::run(const Bytecode& b,std::ostream& output,std::string& error,std::size_
    case OpCode::LoadLocal:
     if(x.slot>=locals.size()||!initialized[x.slot])return fail("QVM invalid or uninitialized local slot");
     stack.push_back(locals[x.slot]);break;
+   case OpCode::ResetLocal:
+    if(x.slot>=locals.size())return fail("QVM RESET_LOCAL references invalid local slot");
+    locals[x.slot]=0.0;initialized[x.slot]=false;mutableLocals[x.slot]=false;break;
    case OpCode::StoreLocal:
    case OpCode::StoreLocalMutable:{
     Value value;if(x.slot>=locals.size()||!pop(value))return fail("QVM invalid local store or stack underflow");

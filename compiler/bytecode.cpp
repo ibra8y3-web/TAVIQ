@@ -46,9 +46,10 @@ const char* name(OpCode op){
  case OpCode::GreaterEqual:return "GREATER_EQUAL";case OpCode::LogicalNot:return "LOGICAL_NOT";
  case OpCode::Jump:return "JUMP";case OpCode::JumpIfFalse:return "JUMP_IF_FALSE";
  case OpCode::StoreLocalMutable:return "STORE_LOCAL_MUTABLE";
+ case OpCode::ResetLocal:return "RESET_LOCAL";
  }return "INVALID";
 }
-bool validOpcode(std::uint8_t op,std::uint32_t version){return op>=1&&(version==1?op<=14:(version==2&&op<=25));}
+bool validOpcode(std::uint8_t op,std::uint32_t version){return op>=1&&(version==1?op<=14:(version==2&&op<=26));}
 std::size_t liveBytes(const State& s){
  std::size_t total=0;
  for(const auto& x:s.locals)if(x.mayInit){if(x.stringBytes>MaxLive-total)return MaxLive+1;total+=x.stringBytes;}
@@ -142,6 +143,11 @@ bool verifyBytecode(const Bytecode& b,std::string& error){
   case OpCode::LoadLocal:{
    if(x.slot>=s.locals.size()||!s.locals[x.slot].definite)return fail("QVM loads invalid, uninitialized or path-dependent local");
    const auto& l=s.locals[x.slot];if(!push(l.type,l.stringBytes))return fail("QVM live string memory exceeds 16 MiB");break;
+  }
+  case OpCode::ResetLocal:{
+   if(x.slot>=s.locals.size())return fail("QVM RESET_LOCAL references invalid local slot");
+   s.locals[x.slot]=LocalState{};
+   break;
   }
   case OpCode::StoreLocal:case OpCode::StoreLocalMutable:{
    if(x.slot>=s.locals.size())return fail("QVM store references invalid local slot");
@@ -269,7 +275,7 @@ std::string disassemble(const Bytecode& b){
   const auto& x=b.code[pc];out+=std::to_string(pc)+"  "+name(x.op);
   if(x.op==OpCode::PushNumber)out+=" "+std::to_string(x.number);
   if(x.op==OpCode::PushString)out+=" \""+x.text+"\"";
-  if(x.op==OpCode::LoadLocal||x.op==OpCode::StoreLocal||x.op==OpCode::StoreLocalMutable||
+  if(x.op==OpCode::LoadLocal||x.op==OpCode::StoreLocal||x.op==OpCode::StoreLocalMutable||x.op==OpCode::ResetLocal||
      x.op==OpCode::Jump||x.op==OpCode::JumpIfFalse)out+=" "+std::to_string(x.slot);
   if(x.op==OpCode::PushBoolean)out+=x.slot?" true":" false";
   out+='\n';

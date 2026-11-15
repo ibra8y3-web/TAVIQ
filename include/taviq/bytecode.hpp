@@ -10,7 +10,7 @@ enum class OpCode : std::uint8_t {
     Length=12, SquareRoot=13, Absolute=14,
     PushBoolean=15, Equal=16, NotEqual=17, Less=18, LessEqual=19,
     Greater=20, GreaterEqual=21, LogicalNot=22, Jump=23,
-    JumpIfFalse=24, StoreLocalMutable=25
+    JumpIfFalse=24, StoreLocalMutable=25, ResetLocal=26
 };
 struct Instruction {
     OpCode op{OpCode::Halt};
