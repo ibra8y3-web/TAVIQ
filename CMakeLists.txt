@@ -23,6 +23,7 @@ add_library(taviq_core
     compiler/compiler.cpp
     compiler/bytecode.cpp
     compiler/native.cpp
+    compiler/native_functions.cpp
     runtime/vm.cpp
     runtime/interpreter.cpp
     compute/parallel.cpp
@@ -95,6 +96,7 @@ find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
     add_test(NAME taviq_cli_integration COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/python/test_cli.py $<TARGET_FILE:taviq> "${CMAKE_C_COMPILER}")
     add_test(NAME taviq_gpu_cli_integration COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/python/test_gpu_cli.py $<TARGET_FILE:taviq> $<TARGET_FILE:taviq_test_compute_provider>)
+    add_test(NAME taviq_native_function_integration COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/python/test_native_functions.py $<TARGET_FILE:taviq> "${CMAKE_C_COMPILER}")
     add_test(NAME taviq_dependency_policy COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_dependencies.py)
     add_test(NAME taviq_python_tool_tests COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_CURRENT_SOURCE_DIR}/tests/python -v)
 endif()
