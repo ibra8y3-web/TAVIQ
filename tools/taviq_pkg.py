@@ -447,6 +447,10 @@ def main():
             for package, resolved_version in resolution.items():
                 print(package+"@"+resolved_version)
             return 0
+        if args.require_signature:
+            index = verify_index_signature(args.index, args.signature, args.public_key)
+        else:
+            index = load_index(args.index)
         installed, already_installed = install_resolution(
             root, index, resolve_dependencies(index, name, version), lock, args.index,
             name, version, args.force
