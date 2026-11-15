@@ -87,10 +87,11 @@ void optimize(Module& module){
       if(fold&&std::isfinite(value)){ins.op=Op::ConstantNumber;ins.number=value;ins.left=ins.right=0;}
      }
     }else if(ins.op==Op::Equal||ins.op==Op::Less){
+     const auto original=ins.op;
      const auto l=constants.find(ins.left),r=constants.find(ins.right);
      if(l!=constants.end()&&r!=constants.end()&&l->second.op==Op::ConstantNumber&&r->second.op==Op::ConstantNumber){
-      ins.op=Op::ConstantBoolean;ins.boolean=ins.op==Op::Equal?l->second.number==r->second.number:l->second.number<r->second.number;
-      // ins.op was just changed; compute comparison with the original operation below in the corrected build.
+      const bool value=original==Op::Equal?l->second.number==r->second.number:l->second.number<r->second.number;
+      ins.op=Op::ConstantBoolean;ins.boolean=value;ins.left=ins.right=0;
      }
     }
     if(ins.op==Op::ConstantNumber||ins.op==Op::ConstantBoolean)constants[ins.result]=ins;

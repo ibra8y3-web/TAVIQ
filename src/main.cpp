@@ -1,3 +1,4 @@
+#include "taviq/ai.hpp"
 #include "taviq/bytecode.hpp"
 #include "taviq/compiler.hpp"
 #include "taviq/gpu.hpp"
@@ -28,6 +29,7 @@ void help(){
  <<"  taviq disasm <file>            Disassemble QVM bytecode\n"
  <<"  taviq emit-c <file> -o <out.c> Emit portable C source for a native toolchain\n"
  <<"  taviq gpu-info <provider>      Load a provider and list its compute devices\n"
+ <<"  taviq ai-generate <provider> <prompt> [tokens] [temperature]\n"
  <<"  taviq version                  Print version\n";
 }
 }
@@ -37,6 +39,18 @@ int main(int argc,char** argv){
  std::string command=argv[1];int pathIndex=2;
  if(argc==2){command="run";pathIndex=1;}
  if(command=="help"||command=="--help"||command=="-h"){help();return 0;}
+ if(command=="ai-generate"){
+  if(argc<4||argc>6){help();return 2;}
+  std::uint32_t tokens=128;double temperature=0.7;
+  try{
+   if(argc>=5)tokens=static_cast<std::uint32_t>(std::stoul(argv[4]));
+   if(argc>=6)temperature=std::stod(argv[5]);
+  }catch(const std::exception&){std::cerr<<"invalid AI generation parameter\n";return 2;}
+  taviq::AiProvider provider;std::string error;taviq::AiResult result;
+  if(!provider.load(argv[2],"{}",error)){std::cerr<<"TAVIQ AI: "<<error<<'\n';return 1;}
+  if(!provider.generate(argv[3],tokens,temperature,result,error)){std::cerr<<"TAVIQ AI: "<<error<<'\n';return 1;}
+  std::cout<<result.text;return 0;
+ }
  if(command=="gpu-info"){
   if(argc!=3){help();return 2;}
   taviq::GpuProvider provider;std::string error;

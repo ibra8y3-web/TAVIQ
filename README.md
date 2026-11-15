@@ -1,20 +1,17 @@
 # TAVIQ — AI-Native Computing Language
 
-**Beyond Code. Beyond Limits.**
+TAVIQ is an evolving open-source programming-language and compute-runtime project.
 
-TAVIQ is an open-source programming-language project for AI-oriented and high-performance computing. The repository reports implemented subsets and outstanding production work separately.
+## Implemented core
 
-## Working implementation
-
-- C++20 frontend with flow main, immutable let, mutable var, assignment, display, Boolean expressions, comparisons, if/else and while.
-- Lexical block scopes, inferred or explicitly annotated number/string/bool declarations, and static type mismatch diagnostics.
-- QVM v2 with conditional/unconditional jumps, CFG-aware verification, runtime instruction budgets and v1 bytecode loading compatibility.
-- Deterministic QVM/lexer/parser mutation tests.
-- C source lowering for the supported numeric subset; control flow is not yet lowered by the C backend.
-- CPU parallel-for with bounded chunk scheduling and exception propagation.
-- Explicit GPU provider ABI loader and gpu-info; production Vulkan/CUDA/Metal providers are not bundled.
-- Pinned Hugging Face model-asset installer, local llama.cpp HTTP client, SHA-256 checked package installer, loopback browser Studio and developer CLI tools.
-- CI builds and tests Linux, Windows and macOS; Android is NDK cross-build only.
+- C++20 frontend for flow main, let, var, explicit number/string/bool annotations, expressions, comparisons, if/else and while.
+- QVM v2 with typed CFG verification, runtime instruction budgets, bounded strings and v1 bytecode loading.
+- Portable C source emitter for its documented subset.
+- CPU parallel-for and explicit GPU provider ABI host.
+- Native AI provider ABI loader with bounded prompts/responses. A provider library must be supplied by the user and is trusted native code; TAVIQ does not ship inference weights or an inference engine.
+- Standalone typed SSA IR model, verifier and initial constant-folding optimizer. The frontend still lowers directly to QVM; the SSA pipeline is not yet the default compiler path.
+- Standalone mark-and-sweep managed heap with explicit root handles. The current QVM value storage has not yet migrated to the managed heap.
+- QVM mutation/fuzz tests, CLI/Studio and Python security tooling.
 
 ## Build
 
@@ -22,47 +19,20 @@ TAVIQ is an open-source programming-language project for AI-oriented and high-pe
     cmake --build build --parallel
     ctest --test-dir build --output-on-failure
 
-## Language example
+## Native AI provider
 
-    flow main {
-        var total: number = 0;
-        var index: number = 0;
+    build/taviq ai-generate /path/to/trusted-provider.so "Explain this algorithm" 256 0.4
 
-        while (index < 5) {
-            index = index + 1;
-            if (index == 3) {
-                total = total + 10;
-            } else {
-                total = total + index;
-            }
-        }
+On Windows, provide a trusted DLL; on macOS a trusted dylib. Provider ABI is defined in include/taviq/ai_provider.h.
 
-        display total;
-        display true and not false;
-        display len("TAVIQ");
-    }
+## GPU providers
 
-    build/taviq run examples/calculator.taviq
-    build/taviq compile examples/calculator.taviq -o calculator.tvqbc
-    build/taviq disasm calculator.tvqbc
-    build/taviq run-bytecode calculator.tvqbc
+    build/taviq gpu-info /path/to/trusted-gpu-provider
 
-## Native output
+The provider host is implemented, but production Vulkan/CUDA/Metal providers are not bundled.
 
-    build/taviq emit-c examples/calculator.taviq -o calculator.c
-    cc calculator.c -o calculator
+## Android
 
-The C emitter remains limited to supported numeric expressions and string literals; it rejects control-flow constructs it cannot lower.
+The Android application module and JNI bridge are being added separately under platforms/android. NDK cross-build success is not a physical-device runtime test.
 
-## AI and model workflow
-
-Review the model card and license first.
-
-    python tools/taviq_hub.py org/model --accept-license --file model.gguf
-    python ai/taviq_ai.py --prompt "Explain this function"
-
-The Hub installs model assets at an immutable revision. An independently installed llama.cpp server (or another inference provider) is still required for actual inference.
-
-## Engineering status
-
-See ROADMAP.md, docs/LANGUAGE_SPEC.md, docs/VM_BYTECODE.md, docs/MEMORY_MODEL.md and docs/PLATFORM_SUPPORT.md. User-defined functions, modules, richer type-system features, LLVM, a native AI engine, production GPU backends, OS sandboxing, full standard library, public signed package registry, debugger/LSP and Android runtime testing remain outstanding.
+See ROADMAP.md and docs/ for exact subsystem status and limitations.
