@@ -12,12 +12,12 @@ The C backend is intentionally described as C lowering; the compiler does not cu
 
 The QVM uses a versioned binary bytecode container. It checks format version, opcode range, section sizes, local-slot bounds, stack underflow and an instruction budget. Bytecode from untrusted sources still requires process isolation for hostile workloads; the VM is not an OS sandbox.
 
-The CPU compute helper offers a bounded, exception-propagating parallel-for utility. GPU compute is exposed as a future provider boundary; no Vulkan/CUDA/Metal execution plugin ships in this version.
+The CPU compute helper offers a bounded, exception-propagating parallel-for utility. The GPU host loads a versioned native provider. An optional OpenCL module implements float32 vector addition using OpenCL GPU devices where available and an explicitly labelled OpenCL CPU fallback otherwise. Vulkan, CUDA and Metal providers are not bundled.
 
 ## AI integration
 
-The AI Hub is a Python asset installer, not an inference runtime. It pins model refs to a Hub commit and verifies LFS SHA-256 where supplied. ai/taviq_ai.py talks to a separately launched llama.cpp server over loopback HTTP. A versioned C provider ABI is defined for future native plugins but is not yet loaded by the language runtime.
+The AI Hub is a Python asset installer, not an inference runtime. It pins model refs to a Hub commit and verifies LFS SHA-256 where supplied. ai/taviq_ai.py talks to a separately launched llama.cpp server over loopback HTTP. The native provider host defines a trusted extension point but no in-process inference engine is bundled.
 
 ## Platform strategy
 
-Core language code uses C++20 and standard threads. Host CI builds Linux, Windows and macOS. An Android arm64 NDK cross-build is included; Android runtime APIs and device execution are not yet certified.
+Core language code uses C++20 and standard threads. Host CI builds Linux, Windows and macOS. An Android arm64 NDK cross-build and Android application workflow are included; Android runtime APIs and execution on a physical device are not certified. The optional OpenCL provider is only built on hosts with an installed OpenCL SDK and driver.
