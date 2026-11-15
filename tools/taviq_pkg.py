@@ -237,6 +237,8 @@ def install_resolution(root, index, resolution, lock, index_reference, root_name
 
     packages_index = index.get("packages", {})
     lock_packages = lock.setdefault("packages", {})
+    if not isinstance(packages_index, dict) or not isinstance(lock_packages, dict):
+        raise ValueError("registry packages and lock packages must be objects")
     prepared = []
     already_installed = []
     canonical_index = json.dumps(index, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -257,7 +259,8 @@ def install_resolution(root, index, resolution, lock, index_reference, root_name
                 raise ValueError("package/version not found in registry index: %s@%s" %
                                  (package_name, package_version))
             url = entry.get("url")
-            expected = entry.get("sha256", "").lower()
+            raw_digest = entry.get("sha256", "")
+            expected = raw_digest.lower() if isinstance(raw_digest, str) else ""
             if not isinstance(url, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
                 raise ValueError("registry entry must supply an HTTPS archive URL and SHA-256 for %s@%s" %
                                  (package_name, package_version))
@@ -269,7 +272,10 @@ def install_resolution(root, index, resolution, lock, index_reference, root_name
             if destination.is_symlink():
                 raise ValueError("refusing to replace a symlinked package directory: %s@%s" %
                                  (package_name, package_version))
-            existing = lock_packages.get(package_name, {}).get(package_version)
+            installed_versions = lock_packages.get(package_name, {})
+            if not isinstance(installed_versions, dict):
+                raise ValueError("invalid lock entries for package " + package_name)
+            existing = installed_versions.get(package_version)
             if destination.is_dir() and isinstance(existing, dict) and existing.get("sha256") == expected and not force:
                 already_installed.append(package_name + "@" + package_version)
                 continue
@@ -321,14 +327,20 @@ def install_resolution(root, index, resolution, lock, index_reference, root_name
                 "registry": index_reference,
             }
             lock_path = root / "taviq.lock"
-            with tempfile.NamedTemporaryFile(
-                mode="w", encoding="utf-8", dir=root,
-                prefix=".taviq-lock-", suffix=".part", delete=False
-            ) as stream:
-                temporary_lock = Path(stream.name)
-                json.dump(lock, stream, indent=2, sort_keys=True)
-                stream.write("\n")
-            os.replace(temporary_lock, lock_path)
+            temporary_lock = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    mode="w", encoding="utf-8", dir=root,
+                    prefix=".taviq-lock-", suffix=".part", delete=False
+                ) as stream:
+                    temporary_lock = Path(stream.name)
+                    json.dump(lock, stream, indent=2, sort_keys=True)
+                    stream.write("\n")
+                os.replace(temporary_lock, lock_path)
+                temporary_lock = None
+            finally:
+                if temporary_lock is not None:
+                    temporary_lock.unlink(missing_ok=True)
         except Exception:
             for destination in reversed(installed_now):
                 if destination.exists() and not destination.is_symlink():
