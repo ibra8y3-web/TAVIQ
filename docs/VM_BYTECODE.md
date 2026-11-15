@@ -1,38 +1,41 @@
 # QVM Bytecode Formats
 
-## Version compatibility
+## Compatibility
 
-- QVM v1 uses the magic bytes TVQVM01 followed by a zero byte. It is still accepted by the loader and VM.
-- QVM v2 uses TVQVM02 followed by a zero byte. Newly compiled source is emitted as v2.
-- Both versions use the same little-endian container sections. V1 is restricted to opcodes 1–14; v2 adds Boolean and control-flow operations.
+- QVM v1 (TVQVM01) remains readable.
+- QVM v2 (TVQVM02) adds Boolean values, comparisons, mutable locals and control-flow jumps.
+- QVM v3 (TVQVM03) adds function metadata, CALL and RETURN. Newly compiled source uses v3.
 
 ## Container layout
 
-1. 8-byte magic/version.
-2. 32-bit instruction count.
-3. 32-bit local-name count.
-4. Each local name: 32-bit byte length and the encoded name bytes.
-5. Each instruction: 8-bit opcode, 32-bit slot/target, 64-bit IEEE-754 operand bits, 32-bit text length and text bytes.
+V1 and v2 retain their original layout: magic, instruction count, local-name count, local names, then instructions containing opcode, slot, IEEE-754 operand bits and text.
 
-## V2 additions
+V3 stores:
+1. Magic, instruction count, main-local count, function count and main-code end offset.
+2. Main local names.
+3. Each function: name, absolute entry/end offsets, return type, parameter type list, local count and local names.
+4. Instructions: opcode, slot/target/function index, argument count, IEEE-754 operand bits and text.
 
-- PUSH_BOOLEAN, EQUAL, NOT_EQUAL, LESS, LESS_EQUAL, GREATER, GREATER_EQUAL and LOGICAL_NOT.
-- JUMP and JUMP_IF_FALSE use an absolute instruction index in the slot field. Conditional jumps pop one Boolean.
-- STORE_LOCAL_MUTABLE is used for var; STORE_LOCAL remains one-time immutable initialization.
-- Existing arithmetic, string, print and built-in opcodes retain their v1 numeric values.
+All integer and floating-point bit fields are little-endian.
+
+## V3 operations
+
+- CALL stores the function-table index in slot and parameter count in argumentCount.
+- CALL pops arguments in reverse order into a newly allocated frame.
+- RETURN pops exactly one value of the declared function return type and transfers it to the caller.
+- Every call has isolated locals, operand-stack base and return address. Recursion is supported with a runtime call-depth limit.
+- Main ends with HALT. Function ranges end with RETURN. Jumps cannot leave their current code range.
 
 ## Verification
 
-The loader, serializer and VM entry point call the same verifier. V1 is checked as straight-line bytecode. V2 uses a control-flow worklist and validates every encoded instruction, jump target, stack height/type at merge points, local definite initialization, local mutability, type consistency, and final reachable HALT.
+The serializer, loader and VM entry point share one verifier. V1/v2 retain compatibility checks. V3 validates function ranges, signatures, argument count/type, stack merges, local definite initialization/mutability, return values, control-flow targets and reachable terminal instructions. Each function is data-flow verified separately with parameters initialized at entry.
 
-The verifier rejects invalid opcodes, non-finite constants, type-invalid operations, stack underflow, path-dependent uninitialized loads, repeated immutable stores, mutable type changes, malformed control flow, invalid jump targets, non-final HALT, trailing bytes, oversized encoded strings and live string usage above 16 MiB.
-
-A loop that grows a carried string without a statically stable bounded size is rejected conservatively. Runtime execution also enforces an instruction budget, counting executed instructions rather than only bytecode length.
+The runtime independently enforces instruction, stack, memory, active-local and call-depth limits. Malformed call targets, argument lists, function ranges, recursive stack exhaustion and type-invalid returns are rejected.
 
 ## Limits
 
-- 1,000,000 encoded instructions.
-- 65,536 locals and operand-stack entries.
-- 1 MiB per encoded string.
-- 16 MiB aggregate encoded local names and instruction strings.
-- 16 MiB estimated live string values.
+- 1,000,000 instructions.
+- 65,536 locals per frame and operand-stack values.
+- 1 MiB per encoded string; 16 MiB aggregate encoded strings.
+- 16 MiB estimated live runtime strings.
+- 256 nested function frames and 1,000,000 active local slots.
