@@ -145,17 +145,20 @@ class ToolSafetyTests(unittest.TestCase):
             def fake_download(url, destination):
                 shutil.copyfile(archives[url], destination)
 
-            lock = {"format": 1, "packages": {}}
             resolved = pkg.resolve_dependencies(index, "app", "1.0.0")
-            with patch.object(pkg, "download", side_effect=fake_download) as mocked:
-                installed, existing = pkg.install_resolution(
-                    root, index, resolved, lock, "https://registry.invalid/index.json",
-                    "app", "1.0.0"
-                )
+            with patch.object(pkg, "load_index", return_value=index), \
+                 patch.object(pkg, "download", side_effect=fake_download) as mocked, \
+                 patch.object(pkg.sys, "argv", [
+                     "taviq-pkg", "install", "app", "--version", "1.0.0",
+                     "--index", "https://registry.invalid/index.json", "--root", str(root)
+                 ]):
+                self.assertEqual(pkg.main(), 0)
                 self.assertEqual(mocked.call_count, 3)
-            self.assertEqual(installed, ["app@1.0.0", "codec@2.0.0", "lib@1.1.0"])
-            self.assertEqual(existing, [])
-            self.assertEqual(lock["resolution"]["root"], {"name": "app", "version": "1.0.0"})
+            self.assertEqual(
+                sorted(path.name + "@" + path.parent.name
+                       for path in (root / ".taviq" / "packages").glob("*/*")),
+                ["1.0.0@app", "1.1.0@lib", "2.0.0@codec"]
+            )
             for name, (filename, payload) in payloads.items():
                 installed_file = root / ".taviq" / "packages" / name / {
                     "app": "1.0.0", "lib": "1.1.0", "codec": "2.0.0"
@@ -165,6 +168,7 @@ class ToolSafetyTests(unittest.TestCase):
             lock_path = root / "taviq.lock"
             persisted = json.loads(lock_path.read_text(encoding="utf-8"))
             self.assertEqual(persisted["resolution"]["packages"], resolved)
+            self.assertEqual(persisted["resolution"]["root"], {"name": "app", "version": "1.0.0"})
             with patch.object(pkg, "download", side_effect=AssertionError("installed package was downloaded")):
                 installed_again, existing_again = pkg.install_resolution(
                     root, index, resolved, persisted, "https://registry.invalid/index.json",
