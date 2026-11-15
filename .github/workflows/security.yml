@@ -33,11 +33,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@v4
         with:
           languages: cpp, python
       - name: Configure CodeQL build
         run: cmake -S . -B build-codeql -DCMAKE_BUILD_TYPE=Debug -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
       - name: Build CodeQL targets
         run: cmake --build build-codeql --parallel 2
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@v4
