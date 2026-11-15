@@ -57,6 +57,10 @@ bool numeric(const std::shared_ptr<Expr>& e,const std::unordered_map<std::string
 }
 }
 bool emitC(const Program& p,std::string& output,std::vector<std::string>& errors){
+ if(!p.functions.empty()){
+  errors.push_back("native C backend does not yet lower user-defined functions");
+  return false;
+ }
  std::ostringstream c;c<<"#include <stdio.h>\n#include <math.h>\n#include <string.h>\nint main(void) {\n";
  std::unordered_map<std::string,std::string> vars;
  std::unordered_map<std::string,Type> types;

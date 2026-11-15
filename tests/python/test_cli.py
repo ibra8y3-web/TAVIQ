@@ -33,6 +33,20 @@ def main():
         assert "LENGTH" in run([sys.executable, str(dev), "inspect", str(source), "--compiler", str(binary)], root).stdout
         assert "profile runs=3" in run([sys.executable, str(dev), "profile", str(source), "--compiler", str(binary), "--runs", "3"], root).stdout
 
+        functions = root / "functions.taviq"
+        functions.write_text(
+            'fn add(a:number,b:number)->number { let result:number=a+b; return result; } '
+            'fn label()->string { return "ok"; } '
+            'flow main { display add(2,3); var i=0; while(i<2){display add(i,10); i=i+1;} display label(); }\n',
+            encoding="utf-8"
+        )
+        assert run([str(binary), "run", str(functions)], root).stdout == "5\n10\n11\nok\n"
+        run([sys.executable, str(dev), "format", str(functions)], root)
+        run([sys.executable, str(dev), "format", "--check", str(functions)], root)
+        run([sys.executable, str(dev), "lint", str(functions), "--compiler", str(binary)], root)
+        function_native = root / "functions.c"
+        run([str(binary), "emit-c", str(functions), "-o", str(function_native)], root, expect=1)
+
         typed = root / "typed.taviq"
         typed.write_text('flow main { let count:number=3; var label:string="ready"; var active:bool=true; display count; display label; display active; }\n', encoding="utf-8")
         assert run([str(binary), "run", str(typed)], root).stdout == "3\nready\ntrue\n"
