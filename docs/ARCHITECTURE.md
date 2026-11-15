@@ -6,7 +6,7 @@ Source -> Lexer -> Parser -> AST -> type checks during lowering -> QVM instructi
 
 Source -> Lexer -> Parser -> AST -> native C lowering -> host C compiler -> machine executable.
 
-The C backend is intentionally described as C lowering; the compiler does not currently link LLVM or emit LLVM IR.
+The native C backend supports typed scalar user functions, parameters, function calls, recursion, return values and structured control flow. Aggregate types and string concatenation remain unsupported by this backend. The C backend does not currently link LLVM or emit LLVM IR.
 
 ## Runtime boundaries
 
