@@ -7,63 +7,9 @@ char Lexer::peek(std::size_t offset) const { return current_+offset<source_.size
 char Lexer::advance() { return current_<source_.size()?source_[current_++]:'\0'; }
 bool Lexer::match(char expected) { if(peek()!=expected)return false; ++current_; return true; }
 void Lexer::add(TokenKind kind,std::string text){tokens_.push_back(Token{kind,std::move(text),line_});}
-void Lexer::skipWhitespace(){
- for(;;){char c=peek();
-  if(c==' '||c=='\r'||c=='\t')advance();
-  else if(c=='\n'){advance();++line_;}
-  else if(c=='/'&&peek(1)=='/'){while(peek()!='\n'&&peek()!='\0')advance();}
-  else break;
- }
-}
-void Lexer::scanIdentifier(){
- const auto start=current_-1;
- while(std::isalnum(static_cast<unsigned char>(peek()))||peek()=='_')advance();
- auto word=source_.substr(start,current_-start);
- if(word=="flow")add(TokenKind::Flow,word);
- else if(word=="main")add(TokenKind::Main,word);
- else if(word=="let")add(TokenKind::Let,word);
- else if(word=="display")add(TokenKind::Display,word);
- else add(TokenKind::Identifier,std::move(word));
-}
-void Lexer::scanNumber(){
- const auto start=current_-1;
- while(std::isdigit(static_cast<unsigned char>(peek())))advance();
- if(peek()=='.'&&std::isdigit(static_cast<unsigned char>(peek(1)))){advance();while(std::isdigit(static_cast<unsigned char>(peek())))advance();}
- if(peek()=='e'||peek()=='E'){
-  const auto save=current_;advance();if(peek()=='+'||peek()=='-')advance();
-  if(!std::isdigit(static_cast<unsigned char>(peek())))current_=save;
-  else while(std::isdigit(static_cast<unsigned char>(peek())))advance();
- }
- add(TokenKind::Number,source_.substr(start,current_-start));
-}
-void Lexer::scanString(){
- std::string value;
- while(peek()!='"'&&peek()!='\0'){
-  char c=advance();if(c=='\n')++line_;
-  if(c=='\\'){char e=advance();if(e=='\0')break;
-   switch(e){case 'n':value.push_back('\n');break;case 't':value.push_back('\t');break;case 'r':value.push_back('\r');break;case '"':value.push_back('"');break;case '\\':value.push_back('\\');break;default:errors_.push_back("Line "+std::to_string(line_)+": unsupported escape sequence");value.push_back(e);}
-  }else value.push_back(c);
- }
- if(peek()=='\0'){errors_.push_back("Line "+std::to_string(line_)+": unterminated string");return;}
- advance();add(TokenKind::String,std::move(value));
-}
-std::vector<Token> Lexer::scan(){
- while(current_<source_.size()){
-  skipWhitespace();if(current_>=source_.size())break;
-  char c=advance();
-  switch(c){
-   case '{':add(TokenKind::LeftBrace,"{");break;case '}':add(TokenKind::RightBrace,"}");break;
-   case '(':add(TokenKind::LeftParen,"(");break;case ')':add(TokenKind::RightParen,")");break;
-   case ';':add(TokenKind::Semicolon,";");break;case '=':add(TokenKind::Equal,"=");break;
-   case '+':add(TokenKind::Plus,"+");break;case '-':add(TokenKind::Minus,"-");break;
-   case '*':add(TokenKind::Star,"*");break;case '/':add(TokenKind::Slash,"/");break;
-   case '"':scanString();break;
-   default:
-    if(std::isalpha(static_cast<unsigned char>(c))||c=='_')scanIdentifier();
-    else if(std::isdigit(static_cast<unsigned char>(c)))scanNumber();
-    else errors_.push_back("Line "+std::to_string(line_)+": unexpected character '"+std::string(1,c)+"'");
-  }
- }
- tokens_.push_back(Token{TokenKind::End,"",line_});return tokens_;
-}
+void Lexer::skipWhitespace(){for(;;){char c=peek();if(c==' '||c=='\r'||c=='\t')advance();else if(c=='\n'){advance();++line_;}else if(c=='/'&&peek(1)=='/'){while(peek()!='\n'&&peek()!='\0')advance();}else break;}}
+void Lexer::scanIdentifier(){const auto start=current_-1;while(std::isalnum(static_cast<unsigned char>(peek()))||peek()=='_')advance();auto word=source_.substr(start,current_-start);if(word=="flow")add(TokenKind::Flow,word);else if(word=="main")add(TokenKind::Main,word);else if(word=="let")add(TokenKind::Let,word);else if(word=="display")add(TokenKind::Display,word);else add(TokenKind::Identifier,std::move(word));}
+void Lexer::scanNumber(){const auto start=current_-1;while(std::isdigit(static_cast<unsigned char>(peek())))advance();if(peek()=='.'&&std::isdigit(static_cast<unsigned char>(peek(1)))){advance();while(std::isdigit(static_cast<unsigned char>(peek())))advance();}if(peek()=='e'||peek()=='E'){const auto save=current_;advance();if(peek()=='+'||peek()=='-')advance();if(!std::isdigit(static_cast<unsigned char>(peek())))current_=save;else while(std::isdigit(static_cast<unsigned char>(peek())))advance();}add(TokenKind::Number,source_.substr(start,current_-start));}
+void Lexer::scanString(){std::string value;while(peek()!='"'&&peek()!='\0'){char c=advance();if(c=='\n')++line_;if(c=='\\'){char e=advance();if(e=='\0')break;switch(e){case 'n':value.push_back('\n');break;case 't':value.push_back('\t');break;case 'r':value.push_back('\r');break;case '"':value.push_back('"');break;case '\\':value.push_back('\\');break;default:errors_.push_back("Line "+std::to_string(line_)+": unsupported escape sequence");value.push_back(e);}}else value.push_back(c);}if(peek()=='\0'){errors_.push_back("Line "+std::to_string(line_)+": unterminated string");return;}advance();add(TokenKind::String,std::move(value));}
+std::vector<Token> Lexer::scan(){while(current_<source_.size()){skipWhitespace();if(current_>=source_.size())break;char c=advance();switch(c){case '{':add(TokenKind::LeftBrace,"{");break;case '}':add(TokenKind::RightBrace,"}");break;case '(':add(TokenKind::LeftParen,"(");break;case ')':add(TokenKind::RightParen,")");break;case ';':add(TokenKind::Semicolon,";");break;case ',':add(TokenKind::Comma,",");break;case '=':add(TokenKind::Equal,"=");break;case '+':add(TokenKind::Plus,"+");break;case '-':add(TokenKind::Minus,"-");break;case '*':add(TokenKind::Star,"*");break;case '/':add(TokenKind::Slash,"/");break;case '"':scanString();break;default:if(std::isalpha(static_cast<unsigned char>(c))||c=='_')scanIdentifier();else if(std::isdigit(static_cast<unsigned char>(c)))scanNumber();else errors_.push_back("Line "+std::to_string(line_)+": unexpected character '"+std::string(1,c)+"'");}}tokens_.push_back(Token{TokenKind::End,"",line_});return tokens_;}
 }
