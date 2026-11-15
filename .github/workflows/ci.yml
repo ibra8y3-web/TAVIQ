@@ -89,7 +89,10 @@ jobs:
           api-level: 35
           arch: x86_64
           target: google_apis
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -no-audio -no-boot-anim -camera-back none
+          profile: pixel_5
+          force-avd-creation: false
+          emulator-boot-timeout: 600
+          emulator-options: -no-snapshot-load -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
           script: gradle -p platforms/android --no-daemon :app:connectedDebugAndroidTest
       - uses: actions/upload-artifact@v7
