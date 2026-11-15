@@ -1,13 +1,19 @@
 #!/usr/bin/env python3
-"""Loopback-only TAVIQ project editor integrated with compiler diagnostics, formatter and QVM debugger."""
+"""Loopback-only TAVIQ project editor integrated with compiler diagnostics and QVM tools."""
 import argparse
 import importlib.util
 import json
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
+import re
 import subprocess
 import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
+
+MAX_SOURCE_BYTES = 2_000_000
+MAX_PROJECT_FILES = 200
+EXCLUDED_DIRS = {".git", ".taviq", "build", "build-android", "dist", ".venv",
+                 "__pycache__", "node_modules"}
 
 PAGE = """<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>TAVIQ Studio</title><style>
@@ -26,7 +32,7 @@ pre{white-space:pre-wrap;background:#0c111a;padding:12px;border-radius:8px;min-h
 <textarea id="editor" spellcheck="false"></textarea><h3>Diagnostics / Output</h3><pre id="output"></pre>
 </section></main>
 <script>
-let current="";const editor=document.querySelector("#editor"),out=document.querySelector("#output");
+let currentId="";const editor=document.querySelector("#editor"),out=document.querySelector("#output");
 async function api(url,method="GET",body=null){
  const options={method,headers:{"Content-Type":"application/json"}};
  if(body!==null)options.body=JSON.stringify(body);
@@ -36,27 +42,25 @@ async function api(url,method="GET",body=null){
 }
 async function refresh(){
  const data=await api("/api/files");const ul=document.querySelector("#files");ul.textContent="";
- for(const file of data.files){const li=document.createElement("li");li.textContent=file;li.onclick=()=>openFile(file);ul.appendChild(li)}
+ for(const file of data.files){const li=document.createElement("li");li.textContent=file.path;li.onclick=()=>openFile(file.id,file.path);ul.appendChild(li)}
 }
-async function openFile(path){
- current=path;document.querySelector("#current").textContent=path;
- const data=await api("/api/file?path="+encodeURIComponent(path));editor.value=data.content||"";out.textContent="";
+async function openFile(id,path){
+ currentId=id;document.querySelector("#current").textContent=path;
+ const data=await api("/api/file?id="+encodeURIComponent(id));editor.value=data.content||"";out.textContent="";
 }
 async function save(){
- if(!current)throw new Error("Create or select a .taviq file first");
- await api("/api/file","PUT",{path:current,content:editor.value});out.textContent="Saved "+current;
+ if(!currentId)throw new Error("Create or select a .taviq file first");
+ await api("/api/file","PUT",{id:currentId,content:editor.value});out.textContent="Saved";
 }
 async function action(name){
  await save();
- const data=await api("/api/"+name,"POST",{path:current});
+ const data=await api("/api/"+name,"POST",{id:currentId});
  out.textContent=(data.stdout||"")+(data.stderr||"")+(data.error||"")+
    (data.diagnostics?JSON.stringify(data.diagnostics,null,2):"");
- if(name==="format"){await openFile(current);await refresh()}
+ if(name==="format"){await openFile(currentId,document.querySelector("#current").textContent);await refresh()}
 }
 document.querySelector("#new").onclick=async()=>{
- const path=window.prompt("New project file (relative .taviq path)","main.taviq");
- if(!path)return;
- try{await api("/api/project/create","POST",{path});await refresh();await openFile(path)}
+ try{const data=await api("/api/project/create","POST",{});await refresh();await openFile(data.id,data.path)}
  catch(e){out.textContent=e.message}
 };
 document.querySelector("#save").onclick=()=>save().catch(e=>out.textContent=e.message);
@@ -91,27 +95,58 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(raw)
 
-    def allowed_origin(self):
+    def allowed_origin(self, require_origin=False):
+        host = urlparse("//" + self.headers.get("Host", "")).hostname
+        if host not in ("127.0.0.1", "localhost"):
+            return False
         origin = self.headers.get("Origin")
         if not origin:
-            return True
+            return not require_origin
         parsed = urlparse(origin)
         return parsed.scheme == "http" and parsed.hostname in ("127.0.0.1", "localhost")
 
-    def safe_file(self, name):
-        if not isinstance(name, str) or not name or "\\" in name:
-            raise ValueError("project path must be a non-empty relative POSIX path")
-        path = Path(name)
-        if path.is_absolute() or PureWindowsPath(name).is_absolute() or path.suffix != ".taviq":
-            raise ValueError("only relative .taviq project files may be accessed")
-        if any(part in ("", ".", "..") for part in path.parts):
-            raise ValueError("path traversal is not permitted")
-        target = (self.root / path).resolve()
-        if self.root not in target.parents or (target.exists() and not target.is_file()):
-            raise ValueError("path is outside the project or not a regular file")
-        if target.exists() and target.stat().st_size > 2_000_000:
-            raise ValueError("source file exceeds 2 MiB")
-        return target
+    def project_files(self):
+        found = []
+        for candidate in self.root.rglob("*.taviq"):
+            try:
+                relative = candidate.relative_to(self.root)
+                if candidate.is_symlink() or any(part in EXCLUDED_DIRS for part in relative.parts):
+                    continue
+                resolved = candidate.resolve(strict=True)
+                resolved.relative_to(self.root)
+                if not resolved.is_file() or resolved.stat().st_size > MAX_SOURCE_BYTES:
+                    continue
+                found.append((relative.as_posix(), resolved))
+            except (OSError, ValueError):
+                continue
+        found.sort(key=lambda item: item[0])
+        return found[:MAX_PROJECT_FILES]
+
+    def project_file(self, identifier):
+        if not isinstance(identifier, str) or not re.fullmatch(r"(?:0|[1-9][0-9]{0,5})", identifier):
+            raise ValueError("invalid project file identifier")
+        index = int(identifier)
+        files = self.project_files()
+        if index >= len(files):
+            raise ValueError("project file does not exist")
+        return files[index]
+
+    def create_project_file(self):
+        for number in range(1, 10001):
+            filename = "untitled-%d.taviq" % number
+            target = self.root / filename
+            try:
+                with target.open("x", encoding="utf-8") as stream:
+                    stream.write('flow main {\n    display "Hello from TAVIQ";\n}\n')
+                break
+            except FileExistsError:
+                continue
+        else:
+            raise RuntimeError("no free project filename is available")
+        for index, item in enumerate(self.project_files()):
+            if item[1] == target.resolve():
+                return str(index), item[0]
+        raise RuntimeError("created project file could not be indexed")
 
     def read_json(self, limit):
         length = int(self.headers.get("Content-Length", "0"))
@@ -129,6 +164,8 @@ class Handler(BaseHTTPRequestHandler):
         return module
 
     def do_GET(self):
+        if not self.allowed_origin():
+            return self.send_json(403, {"error": "host or origin rejected"})
         parsed = urlparse(self.path)
         if parsed.path == "/":
             body = PAGE.encode("utf-8")
@@ -142,20 +179,15 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             if parsed.path == "/api/files":
-                files = []
-                for path in self.root.rglob("*.taviq"):
-                    if ".git" in path.parts or ".taviq" in path.parts or path.is_symlink():
-                        continue
-                    if len(files) >= 200:
-                        break
-                    files.append(path.relative_to(self.root).as_posix())
-                self.send_json(200, {"files": sorted(files)})
+                files = [{"id": str(index), "path": name}
+                         for index, (name, _) in enumerate(self.project_files())]
+                self.send_json(200, {"files": files})
                 return
             if parsed.path == "/api/file":
-                name = parse_qs(parsed.query).get("path", [""])[0]
-                target = self.safe_file(name)
+                identifier = parse_qs(parsed.query).get("id", [""])[0]
+                name, target = self.project_file(identifier)
                 content = target.read_text(encoding="utf-8")
-                if len(content.encode("utf-8")) > 2_000_000:
+                if len(content.encode("utf-8")) > MAX_SOURCE_BYTES:
                     raise ValueError("source file exceeds 2 MiB")
                 self.send_json(200, {"path": name, "content": content})
                 return
@@ -168,15 +200,14 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(400, {"error": str(exc)})
 
     def do_PUT(self):
-        if not self.allowed_origin():
-            return self.send_json(403, {"error": "origin rejected"})
+        if not self.allowed_origin(require_origin=True):
+            return self.send_json(403, {"error": "host or origin rejected"})
         try:
-            data = self.read_json(2_100_000)
-            target = self.safe_file(data.get("path"))
+            data = self.read_json(MAX_SOURCE_BYTES + 8192)
+            _, target = self.project_file(data.get("id"))
             content = data.get("content")
-            if not isinstance(content, str) or len(content.encode("utf-8")) > 2_000_000:
+            if not isinstance(content, str) or len(content.encode("utf-8")) > MAX_SOURCE_BYTES:
                 raise ValueError("content must be text and no larger than 2 MiB")
-            target.parent.mkdir(parents=True, exist_ok=True)
             temporary = target.with_name(target.name + ".part")
             temporary.write_text(content, encoding="utf-8")
             temporary.replace(target)
@@ -185,35 +216,32 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json(400, {"error": str(exc)})
 
     def do_POST(self):
-        if not self.allowed_origin():
-            return self.send_json(403, {"error": "origin rejected"})
+        if not self.allowed_origin(require_origin=True):
+            return self.send_json(403, {"error": "host or origin rejected"})
         try:
             data = self.read_json(8192)
-            name = data.get("path", "")
-            target = self.safe_file(name)
-            if self.path.startswith("/api/project/create"):
-                target.parent.mkdir(parents=True, exist_ok=True)
-                with target.open("x", encoding="utf-8") as stream:
-                    stream.write("flow main {\n    display \"Hello from TAVIQ\";\n}\n")
-                self.send_json(201, {"created": True, "path": name})
+            route = urlparse(self.path).path
+            if route == "/api/project/create":
+                identifier, name = self.create_project_file()
+                self.send_json(201, {"created": True, "id": identifier, "path": name})
                 return
-
+            name, target = self.project_file(data.get("id"))
             if not target.is_file():
                 raise ValueError("project file does not exist")
-
-            if self.path.startswith("/api/format"):
-                command = [self.python, str(self.root / self.dev_path), "format", str(target)]
-            elif self.path.startswith("/api/debug"):
-                command = [str(self.compiler), "debug", str(target)]
-            elif self.path.startswith("/api/check"):
-                command = [str(self.compiler), "check", str(target)]
-            elif self.path.startswith("/api/run"):
-                command = [str(self.compiler), "run", str(target)]
+            relative = target.relative_to(self.root).as_posix()
+            if route == "/api/format":
+                command = [self.python, str(self.root / self.dev_path), "format", relative]
+            elif route == "/api/debug":
+                command = [str(self.compiler), "debug", relative]
+            elif route == "/api/check":
+                command = [str(self.compiler), "check", relative]
+            elif route == "/api/run":
+                command = [str(self.compiler), "run", relative]
             else:
                 return self.send_json(404, {"error": "unknown Studio action"})
 
             result = subprocess.run(command, cwd=self.root, capture_output=True,
-                                    text=True, timeout=30, check=False)
+                                    text=True, timeout=30, check=False, shell=False)
             self.send_json(200, {"returncode": result.returncode,
                                  "stdout": result.stdout[:100000],
                                  "stderr": result.stderr[:100000]})
@@ -232,6 +260,10 @@ def main():
     Handler.compiler = (Handler.root / compiler).resolve() if not compiler.is_absolute() else compiler.resolve()
     if not Handler.root.is_dir():
         parser.error("project root does not exist")
+    try:
+        Handler.compiler.relative_to(Handler.root)
+    except ValueError:
+        parser.error("compiler must be located inside the project root")
     if not Handler.compiler.is_file():
         parser.error("compiler executable not found: " + str(Handler.compiler))
     for tool in (Handler.root / Handler.lsp_path, Handler.root / Handler.dev_path):
