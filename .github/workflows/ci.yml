@@ -99,16 +99,21 @@ jobs:
           gradle-version: "9.9.1"
       - name: Build Android APK with JNI runtime
         run: gradle -p platforms/android --no-daemon :app:assembleDebug
+      - name: Start Android Debug Bridge before emulator launch
+        run: |
+          adb kill-server || true
+          adb start-server
+          adb version
       - name: Run TAVIQ instrumentation tests on an Android emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 30
           arch: x86_64
           target: google_apis
-          profile: pixel_5
-          force-avd-creation: false
-          emulator-boot-timeout: 600
-          emulator-options: -no-snapshot-load -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          profile: pixel_2
+          force-avd-creation: true
+          emulator-boot-timeout: 900
+          emulator-options: -no-snapshot -wipe-data -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none -memory 2048 -cores 2
           disable-animations: true
           script: gradle -p platforms/android --no-daemon :app:connectedDebugAndroidTest
       - uses: actions/upload-artifact@v7
