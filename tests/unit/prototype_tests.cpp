@@ -49,7 +49,14 @@ flow main { display greet("TAVIQ"); display twice(21); display choose(false); di
  CHECK(taviq::Bytecode::load(functionBytes,functionsLoaded,error));CHECK(functionsLoaded.formatVersion==3);
  std::ostringstream loadedFunctionOut;CHECK(taviq::VM{}.run(functionsLoaded,loadedFunctionOut,error)==0);
  CHECK(loadedFunctionOut.str()==functionsOut.str());
- CHECK(!taviq::emitC(parse("fn identity(x: number) -> number { return x; } flow main { display identity(1); }"),functionNativeC,functionNativeErrors));
+ CHECK(taviq::emitC(parse("fn identity(x: number) -> number { return x; } flow main { display identity(1); }"),functionNativeC,functionNativeErrors));
+ CHECK(functionNativeC.find("static double taviq_fn0")!=std::string::npos);
+ CHECK(functionNativeC.find("return taviq_p0")!=std::string::npos);
+ functionNativeErrors.clear();
+ CHECK(!taviq::emitC(parse("fn noReturn(x: number) -> number { if (x>0) { return x; } } flow main { display 1; }"),functionNativeC,functionNativeErrors));
+ functionNativeErrors.clear();
+ CHECK(!taviq::emitC(parse("fn wrongReturn(x: number) -> number { return true; } flow main { display 1; }"),functionNativeC,functionNativeErrors));
+ functionNativeErrors.clear();
  CHECK(!taviq::compile(parse("fn bad(x: number) -> number { return true; } flow main { display bad(1); }"),functionBad,functionErrors));functionErrors.clear();
  CHECK(!taviq::compile(parse("fn bad(x: number) -> number { display x; } flow main { display bad(1); }"),functionBad,functionErrors));functionErrors.clear();
  CHECK(!taviq::compile(parse("fn bad(x: number) -> number { return x; } flow main { display bad(\"x\"); }"),functionBad,functionErrors));functionErrors.clear();
