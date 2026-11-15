@@ -22,6 +22,7 @@ struct Context {
     std::optional<Type> returnType;
     std::vector<std::size_t> returnJumps;
     bool inInlineFunction{false};
+    std::unordered_map<const Statement*,std::uint32_t> plannedSlots;
 };
 
 bool resolveTypeName(const std::string& name,Type& type) {
@@ -258,17 +259,21 @@ bool compileStatements(const std::vector<Statement>& statements,Context& context
                 type=annotated;
             }
             if(!emitExpr(statement.expression,context,errors)){ok=false;continue;}
-            if(context.bytecode.locals.size()>=65'536) {
-                errors.push_back("QVM local limit exceeded");
-                return false;
+            std::uint32_t slot{};
+            const auto planned=context.plannedSlots.find(&statement);
+            if(planned!=context.plannedSlots.end()) {
+                slot=planned->second;
+            } else {
+                if(context.bytecode.locals.size()>=65'536) {
+                    errors.push_back("QVM local limit exceeded");
+                    return false;
+                }
+                slot=static_cast<std::uint32_t>(context.bytecode.locals.size());
+                context.bytecode.locals.push_back(statement.name+"#"+std::to_string(slot));
             }
-            const auto slot=static_cast<std::uint32_t>(context.bytecode.locals.size());
-            context.bytecode.locals.push_back(statement.name+"#"+std::to_string(slot));
             const bool mutableLocal=statement.kind==Statement::Kind::Var;
             context.scopes.back().emplace(statement.name,Binding{slot,type,mutableLocal});
-            const auto store=mutableLocal||context.inInlineFunction?
-                OpCode::StoreLocalMutable:OpCode::StoreLocal;
-            emit(context,store,slot);
+            emit(context,mutableLocal?OpCode::StoreLocalMutable:OpCode::StoreLocal,slot);
         } else if(statement.kind==Statement::Kind::Assign) {
             const auto* binding=resolve(context,statement.name);
             if(!binding) {
@@ -366,6 +371,26 @@ bool blockDefinitelyReturns(const std::vector<Statement>& statements) {
     return false;
 }
 
+bool reserveFunctionLocals(const std::vector<Statement>& statements,Context& context,
+                           std::vector<std::uint32_t>& resetSlots,
+                           std::vector<std::string>& errors) {
+    for(const auto& statement:statements) {
+        if(statement.kind==Statement::Kind::Let||statement.kind==Statement::Kind::Var) {
+            if(context.bytecode.locals.size()>=65'536) {
+                errors.push_back("QVM local limit exceeded while reserving function locals");
+                return false;
+            }
+            const auto slot=static_cast<std::uint32_t>(context.bytecode.locals.size());
+            context.bytecode.locals.push_back("$taviq_local_"+std::to_string(slot));
+            context.plannedSlots.emplace(&statement,slot);
+            resetSlots.push_back(slot);
+        }
+        if(!reserveFunctionLocals(statement.body,context,resetSlots,errors))return false;
+        if(!reserveFunctionLocals(statement.elseBody,context,resetSlots,errors))return false;
+    }
+    return true;
+}
+
 bool emitInlineFunction(const std::shared_ptr<Expr>& call,Context& context,
                         std::vector<std::string>& errors) {
     Type callType;
@@ -401,15 +426,18 @@ bool emitInlineFunction(const std::shared_ptr<Expr>& call,Context& context,
     auto callerScopes=std::move(context.scopes);
     auto callerReturnType=context.returnType;
     auto callerReturnJumps=std::move(context.returnJumps);
+    auto callerPlannedSlots=std::move(context.plannedSlots);
     const bool callerInInlineFunction=context.inInlineFunction;
     context.scopes.clear();
     context.scopes.emplace_back();
     context.returnType=signature.returnType;
     context.returnJumps.clear();
+    context.plannedSlots.clear();
     context.inInlineFunction=true;
     context.expansionStack.push_back(call->text);
 
     std::vector<std::uint32_t> parameterSlots;
+    std::vector<std::uint32_t> resetSlots;
     bool setupOk=true;
     for(std::size_t i=0;i<signature.declaration->parameters.size();++i) {
         const auto& parameter=signature.declaration->parameters[i];
@@ -421,14 +449,19 @@ bool emitInlineFunction(const std::shared_ptr<Expr>& call,Context& context,
         const auto slot=static_cast<std::uint32_t>(context.bytecode.locals.size());
         context.bytecode.locals.push_back("$taviq_"+call->text+"_"+parameter.name+"_"+std::to_string(slot));
         parameterSlots.push_back(slot);
+        resetSlots.push_back(slot);
         context.scopes.back().emplace(parameter.name,
             Binding{slot,signature.parameterTypes[i],false});
     }
     if(setupOk) {
+        setupOk=reserveFunctionLocals(signature.declaration->body,context,resetSlots,errors);
+    }
+    if(setupOk) {
+        for(const auto slot:resetSlots)emit(context,OpCode::ResetLocal,slot);
         for(std::size_t i=temporarySlots.size();i>0;--i)
             emit(context,OpCode::LoadLocal,temporarySlots[i-1]);
         for(const auto slot:parameterSlots)
-            emit(context,OpCode::StoreLocalMutable,slot);
+            emit(context,OpCode::StoreLocal,slot);
     }
 
     bool bodyOk=setupOk;
@@ -441,6 +474,7 @@ bool emitInlineFunction(const std::shared_ptr<Expr>& call,Context& context,
     context.scopes=std::move(callerScopes);
     context.returnType=callerReturnType;
     context.returnJumps=std::move(callerReturnJumps);
+    context.plannedSlots=std::move(callerPlannedSlots);
     context.inInlineFunction=callerInInlineFunction;
     return bodyOk;
 }
