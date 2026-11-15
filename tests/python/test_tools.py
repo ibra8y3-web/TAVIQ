@@ -14,6 +14,7 @@ def load_tool(name, path):
 hub = load_tool("taviq_hub", "tools/taviq_hub.py")
 pkg = load_tool("taviq_pkg", "tools/taviq_pkg.py")
 ai = load_tool("taviq_ai", "ai/taviq_ai.py")
+dependency_audit = load_tool("taviq_dependency_audit", "tools/check_dependencies.py")
 
 class ToolSafetyTests(unittest.TestCase):
     def test_model_id_and_allowlist(self):
@@ -47,6 +48,9 @@ class ToolSafetyTests(unittest.TestCase):
                 ai.validate_generation("hello", 64, temperature)
         with self.assertRaises(ValueError): ai.validate_generation("", 64, 0.7)
         with self.assertRaises(ValueError): ai.validate_generation("hello", 9000, 0.7)
+
+    def test_dependency_policy(self):
+        self.assertEqual(dependency_audit.audit(ROOT), [])
 
     def test_package_version_rejects_traversal(self):
         self.assertEqual(pkg.valid_version("1.2.3-beta.1+build"), "1.2.3-beta.1+build")
