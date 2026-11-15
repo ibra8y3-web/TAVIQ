@@ -19,11 +19,19 @@ add_library(taviq_core
     ai/ai_provider.cpp
     ir/ir.cpp
     memory/heap.cpp
+    stdlib/stdlib.cpp
+    security/policy.cpp
+    ai/ai_provider.cpp
+    ir/ir.cpp
+    memory/heap.cpp
 )
 target_include_directories(taviq_core PUBLIC include)
 target_link_libraries(taviq_core PUBLIC Threads::Threads)
 if(UNIX AND NOT APPLE)
     target_link_libraries(taviq_core PUBLIC dl)
+endif()
+if(WIN32)
+    target_link_libraries(taviq_core PUBLIC ws2_32)
 endif()
 if(MSVC)
     target_compile_options(taviq_core PRIVATE /W4 /permissive-)
@@ -75,6 +83,7 @@ if(Python3_Interpreter_FOUND)
                 ${CMAKE_CURRENT_SOURCE_DIR}/tests/python/test_cli.py
                 $<TARGET_FILE:taviq>
                 "${CMAKE_C_COMPILER}")
+    add_test(NAME taviq_dependency_policy COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tools/check_dependencies.py)
     add_test(NAME taviq_python_tool_tests
         COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_CURRENT_SOURCE_DIR}/tests/python -v)
 endif()
