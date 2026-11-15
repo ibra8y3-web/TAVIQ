@@ -225,7 +225,7 @@ def resolve_dependencies(index, root_name, root_version):
         raise ValueError("dependency constraints cannot be resolved for %s@%s" % (root_name, root_version))
     return dict(sorted(solution.items()))
 
-def install_resolution(root, index, resolution, lock, index_reference, force=False):
+def install_resolution(root, index, resolution, lock, index_reference, root_name, root_version, force=False):
     """Download, verify and stage the complete resolved dependency graph before changing installs."""
     root = Path(root).resolve()
     private_root = root / ".taviq"
@@ -315,10 +315,7 @@ def install_resolution(root, index, resolution, lock, index_reference, force=Fal
                 }
 
             lock["resolution"] = {
-                "root": {
-                    "name": next(iter(resolution)) if resolution else "",
-                    "version": resolution.get(next(iter(resolution)), "") if resolution else "",
-                },
+                "root": {"name": valid_name(root_name), "version": valid_version(root_version)},
                 "packages": dict(sorted(resolution.items())),
                 "registry_sha256": registry_sha256,
                 "registry": index_reference,
@@ -439,7 +436,8 @@ def main():
                 print(package+"@"+resolved_version)
             return 0
         installed, already_installed = install_resolution(
-            root, index, resolve_dependencies(index, name, version), lock, args.index, args.force
+            root, index, resolve_dependencies(index, name, version), lock, args.index,
+            name, version, args.force
         )
         for package in already_installed:
             print("already installed", package)
