@@ -5,202 +5,155 @@ const Token& Parser::advance(){if(!check(TokenKind::End))++current_;return token
 bool Parser::check(TokenKind kind)const{return peek().kind==kind;}
 bool Parser::match(TokenKind kind){if(!check(kind))return false;advance();return true;}
 bool Parser::consume(TokenKind kind,const std::string& message){
-    if(check(kind)){advance();return true;}
-    errors_.push_back("Line "+std::to_string(peek().line)+": "+message);
-    return false;
+ if(check(kind)){advance();return true;}
+ errors_.push_back("Line "+std::to_string(peek().line)+": "+message);return false;
 }
 void Parser::synchronize(){
-    while(!check(TokenKind::End)&&!check(TokenKind::RightBrace)){
-        if(current_>0&&tokens_[current_-1].kind==TokenKind::Semicolon)return;
-        if(check(TokenKind::Let)||check(TokenKind::Var)||check(TokenKind::Display)||
-           check(TokenKind::If)||check(TokenKind::While)||check(TokenKind::Identifier))return;
-        advance();
-    }
+ while(!check(TokenKind::End)&&!check(TokenKind::RightBrace)){
+  if(current_>0&&tokens_[current_-1].kind==TokenKind::Semicolon)return;
+  if(check(TokenKind::Let)||check(TokenKind::Var)||check(TokenKind::Display)||
+     check(TokenKind::If)||check(TokenKind::While)||check(TokenKind::Return)||check(TokenKind::Identifier))return;
+  advance();
+ }
+}
+Function Parser::functionDeclaration(){
+ Function fn;fn.line=peek().line;advance();
+ if(!check(TokenKind::Identifier)){
+  errors_.push_back("Line "+std::to_string(peek().line)+": expected function name");synchronize();return fn;
+ }
+ fn.name=advance().lexeme;
+ consume(TokenKind::LeftParen,"expected '(' after function name");
+ if(!check(TokenKind::RightParen)){
+  do{
+   Parameter p;p.line=peek().line;
+   if(!check(TokenKind::Identifier)){errors_.push_back("Line "+std::to_string(peek().line)+": expected parameter name");break;}
+   p.name=advance().lexeme;
+   if(consume(TokenKind::Colon,"expected ':' after parameter name")){
+    if(check(TokenKind::Identifier))p.declaredType=advance().lexeme;
+    else errors_.push_back("Line "+std::to_string(peek().line)+": expected parameter type");
+   }
+   fn.parameters.push_back(std::move(p));
+  }while(match(TokenKind::Comma));
+ }
+ consume(TokenKind::RightParen,"expected ')' after parameters");
+ consume(TokenKind::Arrow,"expected '->' before return type");
+ if(check(TokenKind::Identifier))fn.returnType=advance().lexeme;
+ else errors_.push_back("Line "+std::to_string(peek().line)+": expected function return type");
+ consume(TokenKind::LeftBrace,"expected '{' before function body");
+ fn.body=blockContents();
+ return fn;
 }
 Statement Parser::declaration(TokenKind tokenKind){
-    Statement result;
-    result.kind=tokenKind==TokenKind::Var?Statement::Kind::Var:Statement::Kind::Let;
-    result.line=peek().line;
-    advance();
-    if(!check(TokenKind::Identifier)){
-        errors_.push_back("Line "+std::to_string(peek().line)+": expected variable name");
-        result.expression=std::make_shared<Expr>();
-        return result;
-    }
-    result.name=advance().lexeme;
-    if(match(TokenKind::Colon)){
-        if(!check(TokenKind::Identifier)){
-            errors_.push_back("Line "+std::to_string(peek().line)+": expected type name after ':'");
-            result.expression=std::make_shared<Expr>();
-            return result;
-        }
-        result.declaredType=advance().lexeme;
-    }
-    if(!consume(TokenKind::Equal,"expected '=' after variable name or type annotation")){
-        result.expression=std::make_shared<Expr>();
-        return result;
-    }
-    result.expression=expression();
-    consume(TokenKind::Semicolon,"expected ';' after declaration");
-    return result;
+ Statement s;s.kind=tokenKind==TokenKind::Var?Statement::Kind::Var:Statement::Kind::Let;s.line=peek().line;advance();
+ if(!check(TokenKind::Identifier)){errors_.push_back("Line "+std::to_string(peek().line)+": expected variable name");s.expression=std::make_shared<Expr>();return s;}
+ s.name=advance().lexeme;
+ if(match(TokenKind::Colon)){
+  if(!check(TokenKind::Identifier)){errors_.push_back("Line "+std::to_string(peek().line)+": expected type name after ':'");s.expression=std::make_shared<Expr>();return s;}
+  s.declaredType=advance().lexeme;
+ }
+ if(!consume(TokenKind::Equal,"expected '=' after variable name or type annotation")){s.expression=std::make_shared<Expr>();return s;}
+ s.expression=expression();consume(TokenKind::Semicolon,"expected ';' after declaration");return s;
 }
 Statement Parser::assignment(){
-    Statement result;
-    result.kind=Statement::Kind::Assign;
-    result.line=peek().line;
-    result.name=advance().lexeme;
-    consume(TokenKind::Equal,"expected '=' after variable name");
-    result.expression=expression();
-    consume(TokenKind::Semicolon,"expected ';' after assignment");
-    return result;
+ Statement s;s.kind=Statement::Kind::Assign;s.line=peek().line;s.name=advance().lexeme;
+ consume(TokenKind::Equal,"expected '=' after variable name");s.expression=expression();
+ consume(TokenKind::Semicolon,"expected ';' after assignment");return s;
 }
 Statement Parser::displayStatement(){
-    Statement result;
-    result.kind=Statement::Kind::Display;
-    result.line=peek().line;
-    advance();
-    result.expression=expression();
-    consume(TokenKind::Semicolon,"expected ';' after display");
-    return result;
+ Statement s;s.kind=Statement::Kind::Display;s.line=peek().line;advance();s.expression=expression();
+ consume(TokenKind::Semicolon,"expected ';' after display");return s;
+}
+Statement Parser::returnStatement(){
+ Statement s;s.kind=Statement::Kind::Return;s.line=peek().line;advance();s.expression=expression();
+ consume(TokenKind::Semicolon,"expected ';' after return value");return s;
 }
 std::vector<Statement> Parser::blockContents(){
-    std::vector<Statement> result;
-    while(!check(TokenKind::RightBrace)&&!check(TokenKind::End)){
-        const auto before=current_;
-        result.push_back(statement());
-        if(current_==before&&!check(TokenKind::End))advance();
-    }
-    consume(TokenKind::RightBrace,"expected '}' to close block");
-    return result;
+ std::vector<Statement> out;
+ while(!check(TokenKind::RightBrace)&&!check(TokenKind::End)){
+  const auto before=current_;out.push_back(statement());
+  if(current_==before&&!check(TokenKind::End))advance();
+ }
+ consume(TokenKind::RightBrace,"expected '}' to close block");return out;
 }
 Statement Parser::ifStatement(){
-    Statement result;
-    result.kind=Statement::Kind::If;
-    result.line=peek().line;
-    advance();
-    consume(TokenKind::LeftParen,"expected '(' after if");
-    result.expression=expression();
-    consume(TokenKind::RightParen,"expected ')' after if condition");
-    consume(TokenKind::LeftBrace,"expected '{' before if body");
-    result.body=blockContents();
-    if(match(TokenKind::Else)){
-        consume(TokenKind::LeftBrace,"expected '{' before else body");
-        result.elseBody=blockContents();
-    }
-    return result;
+ Statement s;s.kind=Statement::Kind::If;s.line=peek().line;advance();
+ consume(TokenKind::LeftParen,"expected '(' after if");s.expression=expression();
+ consume(TokenKind::RightParen,"expected ')' after if condition");consume(TokenKind::LeftBrace,"expected '{' before if body");
+ s.body=blockContents();
+ if(match(TokenKind::Else)){consume(TokenKind::LeftBrace,"expected '{' before else body");s.elseBody=blockContents();}
+ return s;
 }
 Statement Parser::whileStatement(){
-    Statement result;
-    result.kind=Statement::Kind::While;
-    result.line=peek().line;
-    advance();
-    consume(TokenKind::LeftParen,"expected '(' after while");
-    result.expression=expression();
-    consume(TokenKind::RightParen,"expected ')' after while condition");
-    consume(TokenKind::LeftBrace,"expected '{' before while body");
-    result.body=blockContents();
-    return result;
+ Statement s;s.kind=Statement::Kind::While;s.line=peek().line;advance();
+ consume(TokenKind::LeftParen,"expected '(' after while");s.expression=expression();
+ consume(TokenKind::RightParen,"expected ')' after while condition");consume(TokenKind::LeftBrace,"expected '{' before while body");
+ s.body=blockContents();return s;
 }
 Statement Parser::statement(){
-    if(check(TokenKind::Let))return declaration(TokenKind::Let);
-    if(check(TokenKind::Var))return declaration(TokenKind::Var);
-    if(check(TokenKind::Display))return displayStatement();
-    if(check(TokenKind::If))return ifStatement();
-    if(check(TokenKind::While))return whileStatement();
-    if(check(TokenKind::Identifier)&&current_+1<tokens_.size()&&tokens_[current_+1].kind==TokenKind::Equal)
-        return assignment();
-    errors_.push_back("Line "+std::to_string(peek().line)+": expected let, var, assignment, display, if or while");
-    synchronize();
-    return {};
+ if(check(TokenKind::Return))return returnStatement();
+ if(check(TokenKind::Let))return declaration(TokenKind::Let);
+ if(check(TokenKind::Var))return declaration(TokenKind::Var);
+ if(check(TokenKind::Display))return displayStatement();
+ if(check(TokenKind::If))return ifStatement();
+ if(check(TokenKind::While))return whileStatement();
+ if(check(TokenKind::Identifier)&&current_+1<tokens_.size()&&tokens_[current_+1].kind==TokenKind::Equal)return assignment();
+ errors_.push_back("Line "+std::to_string(peek().line)+": expected declaration, assignment, display, return, if or while");
+ synchronize();return {};
 }
 std::shared_ptr<Expr> Parser::expression(){return logicalOr();}
 std::shared_ptr<Expr> Parser::logicalOr(){
-    auto expr=logicalAnd();
-    while(match(TokenKind::Or)){
-        auto node=std::make_shared<Expr>();node->kind=Expr::Kind::Binary;node->op='|';node->left=expr;node->right=logicalAnd();expr=node;
-    }
-    return expr;
+ auto e=logicalAnd();while(match(TokenKind::Or)){auto n=std::make_shared<Expr>();n->kind=Expr::Kind::Binary;n->op='|';n->left=e;n->right=logicalAnd();e=n;}return e;
 }
 std::shared_ptr<Expr> Parser::logicalAnd(){
-    auto expr=equality();
-    while(match(TokenKind::And)){
-        auto node=std::make_shared<Expr>();node->kind=Expr::Kind::Binary;node->op='&';node->left=expr;node->right=equality();expr=node;
-    }
-    return expr;
+ auto e=equality();while(match(TokenKind::And)){auto n=std::make_shared<Expr>();n->kind=Expr::Kind::Binary;n->op='&';n->left=e;n->right=equality();e=n;}return e;
 }
 std::shared_ptr<Expr> Parser::equality(){
-    auto expr=comparison();
-    while(match(TokenKind::EqualEqual)||match(TokenKind::BangEqual)){
-        const auto kind=tokens_[current_-1].kind;
-        auto node=std::make_shared<Expr>();node->kind=Expr::Kind::Binary;node->op=kind==TokenKind::EqualEqual?'q':'!';
-        node->left=expr;node->right=comparison();expr=node;
-    }
-    return expr;
+ auto e=comparison();while(match(TokenKind::EqualEqual)||match(TokenKind::BangEqual)){
+  const auto k=tokens_[current_-1].kind;auto n=std::make_shared<Expr>();n->kind=Expr::Kind::Binary;
+  n->op=k==TokenKind::EqualEqual?'q':'!';n->left=e;n->right=comparison();e=n;}return e;
 }
 std::shared_ptr<Expr> Parser::comparison(){
-    auto expr=term();
-    while(match(TokenKind::Less)||match(TokenKind::LessEqual)||match(TokenKind::Greater)||match(TokenKind::GreaterEqual)){
-        const auto kind=tokens_[current_-1].kind;
-        char op='<';
-        if(kind==TokenKind::LessEqual)op='l';else if(kind==TokenKind::Greater)op='>';else if(kind==TokenKind::GreaterEqual)op='g';
-        auto node=std::make_shared<Expr>();node->kind=Expr::Kind::Binary;node->op=op;node->left=expr;node->right=term();expr=node;
-    }
-    return expr;
+ auto e=term();while(match(TokenKind::Less)||match(TokenKind::LessEqual)||match(TokenKind::Greater)||match(TokenKind::GreaterEqual)){
+  const auto k=tokens_[current_-1].kind;char op='<';if(k==TokenKind::LessEqual)op='l';else if(k==TokenKind::Greater)op='>';else if(k==TokenKind::GreaterEqual)op='g';
+  auto n=std::make_shared<Expr>();n->kind=Expr::Kind::Binary;n->op=op;n->left=e;n->right=term();e=n;}return e;
 }
 std::shared_ptr<Expr> Parser::term(){
-    auto expr=factor();
-    while(match(TokenKind::Plus)||match(TokenKind::Minus)){
-        const char op=tokens_[current_-1].kind==TokenKind::Plus?'+':'-';
-        auto node=std::make_shared<Expr>();node->kind=Expr::Kind::Binary;node->op=op;node->left=expr;node->right=factor();expr=node;
-    }
-    return expr;
+ auto e=factor();while(match(TokenKind::Plus)||match(TokenKind::Minus)){char op=tokens_[current_-1].kind==TokenKind::Plus?'+':'-';
+  auto n=std::make_shared<Expr>();n->kind=Expr::Kind::Binary;n->op=op;n->left=e;n->right=factor();e=n;}return e;
 }
 std::shared_ptr<Expr> Parser::factor(){
-    auto expr=unary();
-    while(match(TokenKind::Star)||match(TokenKind::Slash)){
-        const char op=tokens_[current_-1].kind==TokenKind::Star?'*':'/';
-        auto node=std::make_shared<Expr>();node->kind=Expr::Kind::Binary;node->op=op;node->left=expr;node->right=unary();expr=node;
-    }
-    return expr;
+ auto e=unary();while(match(TokenKind::Star)||match(TokenKind::Slash)){char op=tokens_[current_-1].kind==TokenKind::Star?'*':'/';
+  auto n=std::make_shared<Expr>();n->kind=Expr::Kind::Binary;n->op=op;n->left=e;n->right=unary();e=n;}return e;
 }
 std::shared_ptr<Expr> Parser::unary(){
-    if(match(TokenKind::Minus)||match(TokenKind::Not)||match(TokenKind::Bang)){
-        const auto kind=tokens_[current_-1].kind;
-        auto node=std::make_shared<Expr>();node->kind=Expr::Kind::Unary;node->op=kind==TokenKind::Minus?'-':'!';node->right=unary();return node;
-    }
-    return primary();
+ if(match(TokenKind::Minus)||match(TokenKind::Not)||match(TokenKind::Bang)){const auto k=tokens_[current_-1].kind;
+  auto n=std::make_shared<Expr>();n->kind=Expr::Kind::Unary;n->op=k==TokenKind::Minus?'-':'!';n->right=unary();return n;}return primary();
 }
 std::shared_ptr<Expr> Parser::primary(){
-    if(match(TokenKind::Number)){auto node=std::make_shared<Expr>();node->kind=Expr::Kind::Number;node->text=tokens_[current_-1].lexeme;return node;}
-    if(match(TokenKind::String)){auto node=std::make_shared<Expr>();node->kind=Expr::Kind::String;node->text=tokens_[current_-1].lexeme;return node;}
-    if(match(TokenKind::True)||match(TokenKind::False)){
-        auto node=std::make_shared<Expr>();node->kind=Expr::Kind::Boolean;node->boolean=tokens_[current_-1].kind==TokenKind::True;return node;
-    }
-    if(match(TokenKind::Identifier)){
-        const auto identifier=tokens_[current_-1].lexeme;
-        if(match(TokenKind::LeftParen)){
-            auto call=std::make_shared<Expr>();call->kind=Expr::Kind::Call;call->text=identifier;
-            if(!check(TokenKind::RightParen)){do{call->arguments.push_back(expression());}while(match(TokenKind::Comma));}
-            consume(TokenKind::RightParen,"expected ')' after function arguments");
-            return call;
-        }
-        auto node=std::make_shared<Expr>();node->kind=Expr::Kind::Variable;node->text=identifier;return node;
-    }
-    if(match(TokenKind::LeftParen)){
-        auto node=expression();consume(TokenKind::RightParen,"expected ')' after expression");return node;
-    }
-    errors_.push_back("Line "+std::to_string(peek().line)+": expected a value, variable, call or '('");
-    auto fallback=std::make_shared<Expr>();fallback->kind=Expr::Kind::Boolean;fallback->boolean=false;
-    if(!check(TokenKind::End)&&!check(TokenKind::RightBrace)&&!check(TokenKind::Semicolon))advance();
-    return fallback;
+ if(match(TokenKind::Number)){auto n=std::make_shared<Expr>();n->kind=Expr::Kind::Number;n->text=tokens_[current_-1].lexeme;return n;}
+ if(match(TokenKind::String)){auto n=std::make_shared<Expr>();n->kind=Expr::Kind::String;n->text=tokens_[current_-1].lexeme;return n;}
+ if(match(TokenKind::True)||match(TokenKind::False)){auto n=std::make_shared<Expr>();n->kind=Expr::Kind::Boolean;n->boolean=tokens_[current_-1].kind==TokenKind::True;return n;}
+ if(match(TokenKind::Identifier)){
+  const auto name=tokens_[current_-1].lexeme;
+  if(match(TokenKind::LeftParen)){
+   auto call=std::make_shared<Expr>();call->kind=Expr::Kind::Call;call->text=name;
+   if(!check(TokenKind::RightParen)){do{call->arguments.push_back(expression());}while(match(TokenKind::Comma));}
+   consume(TokenKind::RightParen,"expected ')' after function arguments");return call;
+  }
+  auto n=std::make_shared<Expr>();n->kind=Expr::Kind::Variable;n->text=name;return n;
+ }
+ if(match(TokenKind::LeftParen)){auto n=expression();consume(TokenKind::RightParen,"expected ')' after expression");return n;}
+ errors_.push_back("Line "+std::to_string(peek().line)+": expected a value, variable, call or '('");
+ auto fallback=std::make_shared<Expr>();fallback->kind=Expr::Kind::Boolean;fallback->boolean=false;
+ if(!check(TokenKind::End)&&!check(TokenKind::RightBrace)&&!check(TokenKind::Semicolon))advance();
+ return fallback;
 }
 Program Parser::parse(){
-    Program program;
-    if(!consume(TokenKind::Flow,"expected 'flow'")||
-       !consume(TokenKind::Main,"expected 'main' after 'flow'")||
-       !consume(TokenKind::LeftBrace,"expected '{' after flow main"))return program;
-    program.statements=blockContents();
-    if(!check(TokenKind::End))errors_.push_back("Line "+std::to_string(peek().line)+": unexpected content after main flow");
-    return program;
+ Program p;while(check(TokenKind::Fn))p.functions.push_back(functionDeclaration());
+ if(!consume(TokenKind::Flow,"expected 'flow'")||!consume(TokenKind::Main,"expected 'main' after 'flow'")||
+    !consume(TokenKind::LeftBrace,"expected '{' after flow main"))return p;
+ p.statements=blockContents();
+ if(!check(TokenKind::End))errors_.push_back("Line "+std::to_string(peek().line)+": unexpected content after main flow");
+ return p;
 }
 }

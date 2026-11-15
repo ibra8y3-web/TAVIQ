@@ -30,9 +30,33 @@ int main(){
  const auto arithmetic=compileSource(
   "flow main { let base=2+3*4; let total=(base-4)/2; display base; display total*total; "
   "display \"hello \"+\"TAVIQ\"; display len(\"taviq\"); display sqrt(81)+abs(-3); }");
- CHECK(arithmetic.formatVersion==2);CHECK(taviq::verifyBytecode(arithmetic,error));
+ CHECK(arithmetic.formatVersion==3);CHECK(taviq::verifyBytecode(arithmetic,error));
  std::ostringstream arithmeticOut;CHECK(taviq::VM{}.run(arithmetic,arithmeticOut,error)==0);
  CHECK(arithmeticOut.str()=="14\n25\nhello TAVIQ\n5\n12\n");
+
+ std::string functionNativeC;std::vector<std::string> functionNativeErrors;
+ std::vector<std::string> functionErrors;taviq::Bytecode functionBad;
+ const auto functions=compileSource(R"TAVIQ(fn greet(name: string) -> string { return "hello " + name; }
+fn twice(value: number) -> number { return value * 2; }
+fn choose(flag: bool) -> bool { if (flag) { return true; } else { return false; } }
+fn factorial(n: number) -> number { if (n <= 1) { return 1; } else { return n * factorial(n - 1); } }
+flow main { display greet("TAVIQ"); display twice(21); display choose(false); display factorial(6); })TAVIQ");
+ CHECK(functions.formatVersion==3);CHECK(functions.functions.size()==4);CHECK(taviq::verifyBytecode(functions,error));
+ std::ostringstream functionsOut;CHECK(taviq::VM{}.run(functions,functionsOut,error)==0);
+ CHECK(functionsOut.str()=="hello TAVIQ\n42\nfalse\n720\n");
+ std::stringstream functionBytes(std::ios::in|std::ios::out|std::ios::binary);
+ CHECK(functions.save(functionBytes,error));functionBytes.seekg(0);taviq::Bytecode functionsLoaded;
+ CHECK(taviq::Bytecode::load(functionBytes,functionsLoaded,error));CHECK(functionsLoaded.formatVersion==3);
+ std::ostringstream loadedFunctionOut;CHECK(taviq::VM{}.run(functionsLoaded,loadedFunctionOut,error)==0);
+ CHECK(loadedFunctionOut.str()==functionsOut.str());
+ CHECK(!taviq::emitC(parse("fn identity(x: number) -> number { return x; } flow main { display identity(1); }"),functionNativeC,functionNativeErrors));
+ CHECK(!taviq::compile(parse("fn bad(x: number) -> number { return true; } flow main { display bad(1); }"),functionBad,functionErrors));functionErrors.clear();
+ CHECK(!taviq::compile(parse("fn bad(x: number) -> number { display x; } flow main { display bad(1); }"),functionBad,functionErrors));functionErrors.clear();
+ CHECK(!taviq::compile(parse("fn bad(x: number) -> number { return x; } flow main { display bad(\"x\"); }"),functionBad,functionErrors));functionErrors.clear();
+ CHECK(!taviq::compile(parse("fn bad(x: number) -> number { return x; } flow main { display bad(1,2); }"),functionBad,functionErrors));functionErrors.clear();
+ const auto recursive=compileSource("fn forever(n: number) -> number { return forever(n + 1); } flow main { display forever(0); }");
+ std::ostringstream recursiveOut;CHECK(taviq::VM{}.run(recursive,recursiveOut,error,100000)!=0);
+ CHECK(error=="QVM maximum call depth exceeded");
 
  const auto annotated=compileSource("flow main { let count: number=3; var label: string=\"ready\"; var active: bool=true; display count; display label; display active; }");
  std::ostringstream annotatedOut;CHECK(taviq::VM{}.run(annotated,annotatedOut,error)==0);
@@ -60,7 +84,11 @@ int main(){
  std::string generatedC;std::vector<std::string> nativeErrors;
  CHECK(taviq::emitC(native,generatedC,nativeErrors));
  CHECK(generatedC.find("sqrt(")!=std::string::npos);CHECK(generatedC.find("strlen(")!=std::string::npos);
- const auto unsupportedNative=parse("flow main { if (true) { display 1; } }");
+ const auto structuredNative=parse("flow main { var i=0; var total=0; while(i<4){ i=i+1; if(i==2){ total=total+10; } else { total=total+i; } } display total; display true and not false; }");
+ CHECK(taviq::emitC(structuredNative,generatedC,nativeErrors));
+ CHECK(generatedC.find("while (")!=std::string::npos);
+ CHECK(generatedC.find("if (")!=std::string::npos);
+ const auto unsupportedNative=parse("flow main { display \"a\"+\"b\"; }");
  CHECK(!taviq::emitC(unsupportedNative,generatedC,nativeErrors));
  const auto mismatchedNative=parse("flow main { let label: string=1; }");
  CHECK(!taviq::emitC(mismatchedNative,generatedC,nativeErrors));nativeErrors.clear();
@@ -74,11 +102,11 @@ int main(){
  CHECK(!taviq::compile(parse("flow main { if (1) { display 1; } }"),bad,errors));errors.clear();
  CHECK(!taviq::compile(parse("flow main { while (false) { let x=1; } }"),bad,errors));errors.clear();
 
- taviq::Bytecode noHalt;noHalt.code.push_back({taviq::OpCode::PushNumber,1.0,0,{}});
+ taviq::Bytecode noHalt;noHalt.formatVersion=2;noHalt.code.push_back({taviq::OpCode::PushNumber,1.0,0,{}});
  CHECK(!taviq::verifyBytecode(noHalt,error));
- taviq::Bytecode under;under.code.push_back({taviq::OpCode::Print,0,0,{}});under.code.push_back({taviq::OpCode::Halt,0,0,{}});
+ taviq::Bytecode under;under.formatVersion=2;under.code.push_back({taviq::OpCode::Print,0,0,{}});under.code.push_back({taviq::OpCode::Halt,0,0,{}});
  CHECK(!taviq::verifyBytecode(under,error));
- taviq::Bytecode duplicateStore;duplicateStore.locals={"immutable"};
+ taviq::Bytecode duplicateStore;duplicateStore.formatVersion=2;duplicateStore.locals={"immutable"};
  duplicateStore.code.push_back({taviq::OpCode::PushNumber,1.0,0,{}});
  duplicateStore.code.push_back({taviq::OpCode::StoreLocal,0,0,{}});
  duplicateStore.code.push_back({taviq::OpCode::PushNumber,2.0,0,{}});
@@ -86,7 +114,7 @@ int main(){
  duplicateStore.code.push_back({taviq::OpCode::Halt,0,0,{}});
  CHECK(!taviq::verifyBytecode(duplicateStore,error));
 
- taviq::Bytecode memoryFanout;memoryFanout.locals={"large"};
+ taviq::Bytecode memoryFanout;memoryFanout.formatVersion=2;memoryFanout.locals={"large"};
  memoryFanout.code.push_back({taviq::OpCode::PushString,0,0,std::string(1024*1024,'x')});
  memoryFanout.code.push_back({taviq::OpCode::StoreLocal,0,0,{}});
  for(int n=0;n<16;++n)memoryFanout.code.push_back({taviq::OpCode::LoadLocal,0,0,{}});
@@ -94,13 +122,13 @@ int main(){
  memoryFanout.code.push_back({taviq::OpCode::Halt,0,0,{}});
  CHECK(!taviq::verifyBytecode(memoryFanout,error));CHECK(error.find("memory")!=std::string::npos);
 
- taviq::Bytecode badJump;
+ taviq::Bytecode badJump;badJump.formatVersion=2;
  badJump.code.push_back({taviq::OpCode::PushBoolean,0,1,{}});
  badJump.code.push_back({taviq::OpCode::JumpIfFalse,0,99,{}});
  badJump.code.push_back({taviq::OpCode::Halt,0,0,{}});
  CHECK(!taviq::verifyBytecode(badJump,error));
 
- taviq::Bytecode mergeTypes;
+ taviq::Bytecode mergeTypes;mergeTypes.formatVersion=2;
  mergeTypes.code.push_back({taviq::OpCode::PushBoolean,0,1,{}});
  mergeTypes.code.push_back({taviq::OpCode::JumpIfFalse,0,4,{}});
  mergeTypes.code.push_back({taviq::OpCode::PushNumber,1.0,0,{}});
@@ -110,11 +138,20 @@ int main(){
  mergeTypes.code.push_back({taviq::OpCode::Halt,0,0,{}});
  CHECK(!taviq::verifyBytecode(mergeTypes,error));
 
- std::stringstream v2bytes(std::ios::in|std::ios::out|std::ios::binary);
- CHECK(control.save(v2bytes,error));v2bytes.seekg(0);taviq::Bytecode restored;
- CHECK(taviq::Bytecode::load(v2bytes,restored,error));CHECK(restored.formatVersion==2);
+ std::stringstream v3bytes(std::ios::in|std::ios::out|std::ios::binary);
+ CHECK(control.save(v3bytes,error));v3bytes.seekg(0);taviq::Bytecode restored;
+ CHECK(taviq::Bytecode::load(v3bytes,restored,error));CHECK(restored.formatVersion==3);
  std::ostringstream restoredOut;CHECK(taviq::VM{}.run(restored,restoredOut,error)==0);
  CHECK(restoredOut.str()==controlOut.str());
+
+ taviq::Bytecode v2;v2.formatVersion=2;
+ v2.code.push_back({taviq::OpCode::PushNumber,11.0,0,{}});
+ v2.code.push_back({taviq::OpCode::Print,0,0,{}});
+ v2.code.push_back({taviq::OpCode::Halt,0,0,{}});
+ std::stringstream v2Bytes(std::ios::in|std::ios::out|std::ios::binary);
+ CHECK(v2.save(v2Bytes,error));v2Bytes.seekg(0);taviq::Bytecode v2Loaded;
+ CHECK(taviq::Bytecode::load(v2Bytes,v2Loaded,error));CHECK(v2Loaded.formatVersion==2);
+ std::ostringstream v2Out;CHECK(taviq::VM{}.run(v2Loaded,v2Out,error)==0);CHECK(v2Out.str()=="11\n");
 
  taviq::Bytecode legacy;legacy.formatVersion=1;
  legacy.code.push_back({taviq::OpCode::PushNumber,7.0,0,{}});
@@ -138,6 +175,15 @@ int main(){
  std::vector<int> values(1000,0);
  taviq::parallelFor(0,values.size(),13,[&](std::size_t i){values[i]=static_cast<int>(i*i);},4);
  for(std::size_t i=0;i<values.size();++i)CHECK(values[i]==static_cast<int>(i*i));
+ std::size_t traced=0;
+ std::ostringstream traceOutput;
+ CHECK(taviq::VM{}.run(control,traceOutput,error,1000000,
+  [&](std::size_t,const taviq::Instruction&){++traced;})==0);
+ CHECK(traced>0);
+ traced=0;
+ CHECK(taviq::VM{}.run(control,traceOutput,error,1000000,
+  [&](std::size_t,const taviq::Instruction&){++traced;throw std::runtime_error("stop trace");})!=0);
+ CHECK(error.find("trace callback failed")!=std::string::npos);
  std::atomic<std::size_t> calls{0};
  taviq::parallelFor(0,0,0,[&](std::size_t){++calls;},1);CHECK(calls.load()==0);
  taviq::parallelFor(std::numeric_limits<std::size_t>::max()-1,std::numeric_limits<std::size_t>::max(),5,

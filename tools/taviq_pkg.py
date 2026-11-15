@@ -7,6 +7,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import shutil
+import subprocess
 import stat
 import sys
 import tarfile
@@ -120,6 +121,146 @@ def load_index(index):
             return json.loads(r.read(8 * 1024 * 1024).decode("utf-8"))
     return json.loads(Path(index).expanduser().read_text(encoding="utf-8"))
 
+SEMVER_RE = re.compile(r"^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$")
+
+def version_key(value):
+    match = SEMVER_RE.fullmatch(value)
+    if not match:
+        raise ValueError("invalid semantic version in registry: " + str(value))
+    major, minor, patch = (int(match.group(i)) for i in (1, 2, 3))
+    prerelease = match.group(4)
+    if prerelease is None:
+        pre_key = ((2, ""),)
+    else:
+        pre_key = tuple((0, int(part)) if part.isdigit() else (1, part)
+                        for part in prerelease.split("."))
+    return major, minor, patch, pre_key
+
+def satisfies(version, constraint):
+    current = version_key(version)
+    if not isinstance(constraint, str) or not constraint.strip():
+        raise ValueError("dependency range must be a non-empty string")
+    for raw in constraint.split(","):
+        term = raw.strip()
+        if term in ("", "*"):
+            continue
+        match = re.fullmatch(r"(\^|~|>=|<=|>|<|==)?\s*(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)", term)
+        if not match:
+            raise ValueError("unsupported dependency range: " + term)
+        operator, requested = match.groups()
+        target = version_key(requested)
+        operator = operator or "=="
+        if operator == "^":
+            major, minor, patch = target[:3]
+            upper = (major+1, 0, 0) if major else ((0, minor+1, 0) if minor else (0, 0, patch+1))
+            if not (current >= target and current < (*upper, ((2, ""),))):
+                return False
+        elif operator == "~":
+            major, minor, patch = target[:3]
+            if not (current >= target and current < (major, minor+1, 0, ((2, ""),))):
+                return False
+        elif operator == "==" and current != target:
+            return False
+        elif operator == ">=" and current < target:
+            return False
+        elif operator == "<=" and current > target:
+            return False
+        elif operator == ">" and current <= target:
+            return False
+        elif operator == "<" and current >= target:
+            return False
+    return True
+
+def resolve_dependencies(index, root_name, root_version):
+    packages = index.get("packages")
+    if not isinstance(packages, dict):
+        raise ValueError("registry index has no packages object")
+    selected = {}
+
+    def search(chosen, constraints):
+        for name, version in chosen.items():
+            if not all(satisfies(version, item) for item in constraints.get(name, [])):
+                return None
+        pending = sorted(name for name in constraints if name not in chosen)
+        if not pending:
+            return chosen
+        name = pending[0]
+        package = packages.get(name)
+        if not isinstance(package, dict) or not isinstance(package.get("versions"), dict):
+            return None
+        candidates = []
+        for version, metadata in package["versions"].items():
+            try:
+                version_key(version)
+                if all(satisfies(version, item) for item in constraints[name]):
+                    candidates.append(version)
+            except ValueError:
+                continue
+        for version in sorted(candidates, key=version_key, reverse=True):
+            metadata = package["versions"][version]
+            dependencies = metadata.get("dependencies", {})
+            if not isinstance(dependencies, dict):
+                raise ValueError("dependencies for %s@%s must be an object" % (name, version))
+            next_constraints = {key:list(value) for key,value in constraints.items()}
+            valid = True
+            for dep_name, dep_range in dependencies.items():
+                valid_name(dep_name)
+                if not isinstance(dep_range, str):
+                    raise ValueError("dependency range for %s must be a string" % dep_name)
+                next_constraints.setdefault(dep_name, []).append(dep_range)
+                if dep_name in chosen and not satisfies(chosen[dep_name], dep_range):
+                    valid = False
+                    break
+            if not valid:
+                continue
+            next_chosen = dict(chosen)
+            next_chosen[name] = version
+            result = search(next_chosen, next_constraints)
+            if result is not None:
+                return result
+        return None
+
+    solution = search({}, {valid_name(root_name): ["=="+valid_version(root_version)]})
+    if solution is None:
+        raise ValueError("dependency constraints cannot be resolved for %s@%s" % (root_name, root_version))
+    return dict(sorted(solution.items()))
+
+def verify_index_signature(index_reference, signature_reference, public_key):
+    if not public_key or not signature_reference:
+        raise ValueError("a public key and detached signature are required")
+    def read_reference(reference, limit):
+        parsed = urllib.parse.urlparse(reference)
+        if parsed.scheme == "https":
+            req = urllib.request.Request(reference, headers={"User-Agent":"TAVIQ-Package-Manager/0.2"})
+            with urllib.request.urlopen(req, timeout=30) as response:
+                if urllib.parse.urlparse(response.geturl()).scheme != "https":
+                    raise ValueError("signature URLs must not redirect away from HTTPS")
+                data = response.read(limit+1)
+            if len(data) > limit:
+                raise ValueError("signed registry object exceeds size limit")
+            return data
+        return Path(reference).expanduser().read_bytes()
+    try:
+        signed_data = read_reference(index_reference, 8*1024*1024)
+        signature = read_reference(signature_reference, 64*1024)
+        key_path = Path(public_key).expanduser().resolve()
+        if not key_path.is_file():
+            raise ValueError("public key file does not exist")
+        with tempfile.TemporaryDirectory(prefix="taviq-registry-verify-") as directory:
+            root = Path(directory)
+            data_path = root/"index.json"
+            signature_path = root/"index.sig"
+            data_path.write_bytes(signed_data)
+            signature_path.write_bytes(signature)
+            command = ["openssl","pkeyutl","-verify","-pubin","-inkey",str(key_path),
+                       "-sigfile",str(signature_path),"-rawin","-in",str(data_path)]
+            result = subprocess.run(command,capture_output=True,text=True,timeout=30,check=False)
+            if result.returncode != 0:
+                raise ValueError("registry Ed25519 signature verification failed")
+        return json.loads(signed_data.decode("utf-8"))
+    except FileNotFoundError as exc:
+        raise ValueError("OpenSSL is required to verify signed registries") from exc
+
 def main():
     p = argparse.ArgumentParser(description="TAVIQ package manager")
     sub = p.add_subparsers(dest="command", required=True)
@@ -127,9 +268,16 @@ def main():
     ins.add_argument("name"); ins.add_argument("--version", required=True)
     ins.add_argument("--index", required=True, help="HTTPS index URL or local JSON index")
     ins.add_argument("--root", default="."); ins.add_argument("--force", action="store_true")
+    ins.add_argument("--require-signature", action="store_true")
+    ins.add_argument("--public-key"); ins.add_argument("--signature")
     rem = sub.add_parser("remove"); rem.add_argument("name"); rem.add_argument("--version")
     rem.add_argument("--root", default=".")
     ls = sub.add_parser("list"); ls.add_argument("--root", default=".")
+    resolve = sub.add_parser("resolve", help="resolve semantic-version dependencies and write taviq.lock")
+    resolve.add_argument("name"); resolve.add_argument("--version", required=True)
+    resolve.add_argument("--index", required=True); resolve.add_argument("--root", default=".")
+    resolve.add_argument("--require-signature", action="store_true")
+    resolve.add_argument("--public-key"); resolve.add_argument("--signature")
     args = p.parse_args(); root = Path(args.root).resolve()
     package_root = root / ".taviq" / "packages"; lock_path = root / "taviq.lock"
     try:
@@ -153,7 +301,26 @@ def main():
             tmp = lock_path.with_suffix(".lock.part"); tmp.write_text(json.dumps(lock, indent=2), encoding="utf-8"); os.replace(tmp, lock_path)
             return 0
         version = valid_version(args.version)
-        index = load_index(args.index)
+        if args.command == "resolve":
+            if args.require_signature:
+                index = verify_index_signature(args.index,args.signature,args.public_key)
+            else:
+                index = load_index(args.index)
+            resolution = resolve_dependencies(index,name,version)
+            canonical_index = json.dumps(index,sort_keys=True,separators=(",",":")).encode("utf-8")
+            lock["resolution"] = {"root":{"name":name,"version":version},
+                                  "packages":resolution,
+                                  "registry_sha256":hashlib.sha256(canonical_index).hexdigest()}
+            tmp=lock_path.with_suffix(".lock.part")
+            tmp.write_text(json.dumps(lock,indent=2,sort_keys=True),encoding="utf-8")
+            os.replace(tmp,lock_path)
+            for package, resolved_version in resolution.items():
+                print(package+"@"+resolved_version)
+            return 0
+        if args.require_signature:
+            index = verify_index_signature(args.index,args.signature,args.public_key)
+        else:
+            index = load_index(args.index)
         entry = index.get("packages", {}).get(name, {}).get("versions", {}).get(version)
         if not isinstance(entry, dict):
             raise ValueError("package/version not found in registry index")

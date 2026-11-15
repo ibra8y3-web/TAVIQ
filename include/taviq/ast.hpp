@@ -15,14 +15,29 @@ struct Expr {
     std::vector<std::shared_ptr<Expr>> arguments;
 };
 struct Statement {
-    enum class Kind { Let, Var, Assign, Display, If, While };
+    enum class Kind { Let, Var, Assign, Display, If, While, Return };
     Kind kind{Kind::Display};
     std::string name;
-    std::string declaredType; // number, string or bool; empty means infer
+    std::string declaredType;
     std::shared_ptr<Expr> expression;
     std::size_t line{};
     std::vector<Statement> body;
     std::vector<Statement> elseBody;
 };
-struct Program { std::vector<Statement> statements; };
+struct Parameter {
+    std::string name;
+    std::string declaredType;
+    std::size_t line{};
+};
+struct Function {
+    std::string name;
+    std::vector<Parameter> parameters;
+    std::string returnType;
+    std::size_t line{};
+    std::vector<Statement> body;
+};
+struct Program {
+    std::vector<Function> functions;
+    std::vector<Statement> statements;
+};
 }

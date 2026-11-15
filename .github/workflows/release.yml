@@ -1,0 +1,101 @@
+name: TAVIQ Release
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version without leading v
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build, package and keyless-sign / ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-x86_64
+            binary: build/taviq
+          - os: windows-latest
+            platform: windows-x86_64
+            binary: build/Release/taviq.exe
+          - os: macos-latest
+            platform: macos
+            binary: build/taviq
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Set reproducible build timestamp
+        shell: bash
+        run: echo "SOURCE_DATE_EPOCH=$(git show -s --format=%ct $GITHUB_SHA)" >> "$GITHUB_ENV"
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build --config Release --parallel
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+      - name: Determine version
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "TAVIQ_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          else
+            echo "TAVIQ_VERSION=${{ inputs.version }}" >> "$GITHUB_ENV"
+          fi
+      - name: Generate SBOM
+        shell: bash
+        run: python tools/taviq_sbom.py --root . --version "$TAVIQ_VERSION" --output dist/taviq.cdx.json
+      - name: Package release
+        shell: bash
+        run: python tools/taviq_release.py --binary "${{ matrix.binary }}" --sbom dist/taviq.cdx.json --output dist --version "$TAVIQ_VERSION" --platform "${{ matrix.platform }}" --extra README.md --extra LICENSE --extra NOTICE
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v4.1.0
+      - name: Sign release artifacts and SBOM
+        shell: bash
+        run: |
+          for file in dist/*.tar.gz dist/*.zip dist/taviq.cdx.json; do
+            cosign sign-blob --yes --bundle "$file.sigstore.json" "$file"
+          done
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-${{ matrix.platform }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: release-*
+          path: dist
+          merge-multiple: true
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --generate-notes
+      - name: Upload archives, checksums, SBOM and Sigstore bundles
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          find dist -maxdepth 1 -type f -print0 | while IFS= read -r -d '' file; do
+            gh release upload "$GITHUB_REF_NAME" "$file" --clobber
+          done

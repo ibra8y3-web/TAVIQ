@@ -63,6 +63,51 @@ class ToolSafetyTests(unittest.TestCase):
             with self.assertRaises(ValueError): pkg.safe_target(Path(d), "../escape.txt")
             with self.assertRaises(ValueError): pkg.safe_target(Path(d), "subdir\\..\\escape.txt")
 
+
+    def test_semver_dependency_resolution(self):
+        index = {"packages": {
+            "app": {"versions": {"1.0.0": {"dependencies": {"lib": "^1.0.0", "codec": "~2.1.0"}}}},
+            "lib": {"versions": {
+                "1.0.0": {"dependencies": {}}, "1.2.0": {"dependencies": {}},
+                "2.0.0": {"dependencies": {}}
+            }},
+            "codec": {"versions": {"2.1.0": {"dependencies": {}}, "2.2.0": {"dependencies": {}}}}
+        }}
+        resolved = pkg.resolve_dependencies(index, "app", "1.0.0")
+        self.assertEqual(resolved, {"app":"1.0.0", "codec":"2.1.0", "lib":"1.2.0"})
+
+    def test_semver_dependency_conflict_is_rejected(self):
+        index = {"packages": {
+            "app": {"versions": {"1.0.0": {"dependencies": {"left": "*", "right": "*"}}}},
+            "left": {"versions": {"1.0.0": {"dependencies": {"shared": "^1.0.0"}}}},
+            "right": {"versions": {"1.0.0": {"dependencies": {"shared": "^2.0.0"}}}},
+            "shared": {"versions": {"1.5.0": {"dependencies": {}}, "2.0.0": {"dependencies": {}}}}
+        }}
+        with self.assertRaises(ValueError):
+            pkg.resolve_dependencies(index, "app", "1.0.0")
+
+    def test_semver_dependency_resolution(self):
+        index = {"packages": {
+            "app": {"versions": {"1.0.0": {"dependencies": {"lib": "^1.0.0", "codec": "~2.1.0"}}}},
+            "lib": {"versions": {
+                "1.0.0": {"dependencies": {}}, "1.2.0": {"dependencies": {}},
+                "2.0.0": {"dependencies": {}}
+            }},
+            "codec": {"versions": {"2.1.0": {"dependencies": {}}, "2.2.0": {"dependencies": {}}}}
+        }}
+        self.assertEqual(pkg.resolve_dependencies(index,"app","1.0.0"),
+                         {"app":"1.0.0","codec":"2.1.0","lib":"1.2.0"})
+
+    def test_semver_dependency_conflict_is_rejected(self):
+        index = {"packages": {
+            "app": {"versions": {"1.0.0": {"dependencies": {"left": "*", "right": "*"}}}},
+            "left": {"versions": {"1.0.0": {"dependencies": {"shared": "^1.0.0"}}}},
+            "right": {"versions": {"1.0.0": {"dependencies": {"shared": "^2.0.0"}}}},
+            "shared": {"versions": {"1.5.0": {"dependencies": {}}, "2.0.0": {"dependencies": {}}}}
+        }}
+        with self.assertRaises(ValueError):
+            pkg.resolve_dependencies(index,"app","1.0.0")
+
     def test_zip_extraction(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d); archive = root / "package.zip"

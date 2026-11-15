@@ -1,24 +1,24 @@
 # TAVIQ Engineering Roadmap
 
-Status reflects code and CI evidence on the default branch, not directory names or specifications.
+Status reflects committed implementation and CI evidence, not documentation directories.
 
-| Stage | Scope | Current status | Remaining work |
+| Stage | Scope | Status after QVM v3 implementation | Remaining |
 |---|---|---|---|
-| 01 | Foundation/build | implemented | signed reproducible releases |
-| 02 | Frontend | implemented - expanded subset | user-defined functions, parameters, returns, imports/modules, arrays, structs and Unicode identifiers |
-| 03 | Type system | implemented - inferred and explicit number/string/bool | user-defined types, structs, generics, interfaces, union types and richer diagnostics |
-| 04 | IR | implemented - QVM instruction IR | standalone SSA IR and optimization passes |
-| 05 | QVM | implemented - v2 CFG verifier and v1 loader | coverage-guided fuzzing, source maps, calls/closures and richer opcodes |
-| 06 | Native backend | implemented - C lowering subset | LLVM backend, optimization and control-flow lowering |
-| 07 | Runtime | in progress | managed heap, GC/ownership, OS abstraction and structured concurrency |
-| 08 | AI | in progress | bundled native inference engine, streaming, embeddings and model lifecycle API |
-| 09 | Compute | implemented - provider host loader | production Vulkan/CUDA/Metal providers, scheduling and real-device validation |
-| 10 | Security | in progress | OS sandbox, capability enforcement, signed providers and plugin isolation |
-| 11 | Standard library | implemented - initial intrinsics | collections, IO, filesystem, networking, time, async and AI modules |
-| 12 | Packages | implemented - local registry flow | public registry, signatures, dependency solving and publication |
-| 13 | Developer tools | implemented - formatter/linter/inspector/basic profiler | LSP, debugger, breakpoints, source maps and sampling profiler |
-| 14 | Platforms | implemented - CI builds | Android application/JNI layer and physical-device runtime validation |
-| 15 | Studio | implemented - initial loopback editor | project model, language services, debugger integration and production UX |
-| 16 | Release engineering | in progress | signed binaries, reproducible builds, SBOM and release promotion automation |
+| 01 | Foundation/build | implemented | tagged release artifacts |
+| 02 | Frontend | typed functions, parameters, returns, recursion, if/else and while | modules/imports, arrays, structs, closures and Unicode identifiers |
+| 03 | Type system | inferred/explicit number/string/bool and typed signatures | user types, generics, interfaces, unions and richer inference |
+| 04 | IR | standalone typed SSA-like IR and initial constant folding | complete Phi/dominance and frontend-to-SSA lowering |
+| 05 | QVM | v3 CALL/RETURN frames, recursion, v1/v2 compatibility and CFG verification | closures, source maps, advanced fuzzing and richer opcodes |
+| 06 | Native backend | C lowering for supported scalar and structured control flow | function/aggregate lowering and LLVM/JIT |
+| 07 | Runtime | bounded managed heap with explicit roots and mark/sweep | connect heap to QVM values, ownership, FFI and OS abstractions |
+| 08 | AI | native provider ABI host and CLI | bundled inference engine, streaming, embeddings and lifecycle |
+| 09 | Compute | dynamic GPU provider host | production Vulkan/CUDA/Metal modules and physical-device validation |
+| 10 | Security | capability policy and fail-closed Linux Bubblewrap launcher | VM integration and Windows/macOS/Android sandbox adapters |
+| 11 | Standard library | bounded arrays, workspace file IO, UTC time, binary serialization, plain TCP | TLS, JSON, async and broader collections/platform APIs |
+| 12 | Packages | semver resolver, signed index publishing and local registry | automatic transitive installation and hosted service |
+| 13 | Developer tools | formatter, linter, inspector, profiler, trace breakpoints and initial LSP | full semantic LSP and interactive source debugger |
+| 14 | Platforms | Android Gradle/JNI app and emulator tests | physical device testing, lifecycle/storage polish |
+| 15 | Studio | loopback editor, project actions and diagnostics | full LSP/debugger UI integration |
+| 16 | Release | reproducible archives, CycloneDX source inventory and Sigstore workflow | signed tag releases and complete dependency SBOM |
 
-The current native C backend deliberately rejects if, else and while; those constructs currently execute through QVM v2. The current AI client requires a separate inference service. GPU provider loading is implemented, but production accelerator modules are not bundled.
+Unsupported native constructs and provider backends fail explicitly rather than silently omitting work.
