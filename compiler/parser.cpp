@@ -28,7 +28,15 @@ Statement Parser::declaration(TokenKind tokenKind){
         return result;
     }
     result.name=advance().lexeme;
-    if(!consume(TokenKind::Equal,"expected '=' after variable name")){
+    if(match(TokenKind::Colon)){
+        if(!check(TokenKind::Identifier)){
+            errors_.push_back("Line "+std::to_string(peek().line)+": expected type name after ':'");
+            result.expression=std::make_shared<Expr>();
+            return result;
+        }
+        result.declaredType=advance().lexeme;
+    }
+    if(!consume(TokenKind::Equal,"expected '=' after variable name or type annotation")){
         result.expression=std::make_shared<Expr>();
         return result;
     }

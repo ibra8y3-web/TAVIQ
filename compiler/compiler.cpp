@@ -142,7 +142,17 @@ bool compileStatements(const std::vector<Statement>& statements,Context& c,
     errors.push_back("line "+std::to_string(s.line)+": variable already declared in this scope: "+s.name);ok=false;continue;
    }
    Type type;
-   if(!infer(s.expression,c,type,errors)||!emitExpr(s.expression,c,errors)){ok=false;continue;}
+   if(!infer(s.expression,c,type,errors)){ok=false;continue;}
+   if(!s.declaredType.empty()){
+    Type annotated=Type::Number;
+    if(s.declaredType=="number")annotated=Type::Number;
+    else if(s.declaredType=="string")annotated=Type::String;
+    else if(s.declaredType=="bool")annotated=Type::Boolean;
+    else{errors.push_back("line "+std::to_string(s.line)+": unknown type annotation '"+s.declaredType+"' (use number, string or bool)");ok=false;continue;}
+    if(type!=annotated){errors.push_back("line "+std::to_string(s.line)+": initializer for '"+s.name+"' does not match declared type '"+s.declaredType+"'");ok=false;continue;}
+    type=annotated;
+   }
+   if(!emitExpr(s.expression,c,errors)){ok=false;continue;}
    if(c.bytecode.locals.size()>=65'536){errors.push_back("QVM local limit exceeded");return false;}
    const auto slot=static_cast<std::uint32_t>(c.bytecode.locals.size());
    c.bytecode.locals.push_back(s.name+"#"+std::to_string(slot));
