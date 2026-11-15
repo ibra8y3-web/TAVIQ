@@ -268,6 +268,8 @@ def main():
     ins.add_argument("name"); ins.add_argument("--version", required=True)
     ins.add_argument("--index", required=True, help="HTTPS index URL or local JSON index")
     ins.add_argument("--root", default="."); ins.add_argument("--force", action="store_true")
+    ins.add_argument("--require-signature", action="store_true")
+    ins.add_argument("--public-key"); ins.add_argument("--signature")
     rem = sub.add_parser("remove"); rem.add_argument("name"); rem.add_argument("--version")
     rem.add_argument("--root", default=".")
     ls = sub.add_parser("list"); ls.add_argument("--root", default=".")
@@ -305,23 +307,20 @@ def main():
             else:
                 index = load_index(args.index)
             resolution = resolve_dependencies(index,name,version)
+            canonical_index = json.dumps(index,sort_keys=True,separators=(",",":")).encode("utf-8")
             lock["resolution"] = {"root":{"name":name,"version":version},
                                   "packages":resolution,
-                                  "registry_sha256":hashlib.sha256(
-                                      (Path(args.index).read_bytes() if not args.index.startswith("https://")
-                                       else json.dumps(index,sort_keys=True,separators=(",",":")).encode()).encode()
-                                      if isinstance((Path(args.index).read_bytes() if not args.index.startswith("https://")
-                                                     else json.dumps(index,sort_keys=True,separators=(",",":"))),str)
-                                      else (Path(args.index).read_bytes() if not args.index.startswith("https://")
-                                            else json.dumps(index,sort_keys=True,separators=(",",":")).encode())
-                                  ).hexdigest()}
+                                  "registry_sha256":hashlib.sha256(canonical_index).hexdigest()}
             tmp=lock_path.with_suffix(".lock.part")
             tmp.write_text(json.dumps(lock,indent=2,sort_keys=True),encoding="utf-8")
             os.replace(tmp,lock_path)
             for package, resolved_version in resolution.items():
                 print(package+"@"+resolved_version)
             return 0
-        index = load_index(args.index)
+        if args.require_signature:
+            index = verify_index_signature(args.index,args.signature,args.public_key)
+        else:
+            index = load_index(args.index)
         entry = index.get("packages", {}).get(name, {}).get("versions", {}).get(version)
         if not isinstance(entry, dict):
             raise ValueError("package/version not found in registry index")
