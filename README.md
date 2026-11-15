@@ -8,9 +8,9 @@ TAVIQ is an open-source programming-language project for AI-oriented and high-pe
 
 - C++20 frontend for flow main, let, numeric expressions, string literals and display.
 - Checks for undefined/duplicate variables and invalid arithmetic types.
-- QVM bytecode generation, versioned binary save/load, disassembly and bounded execution.
+- QVM bytecode generation, versioned binary save/load, disassembly, static verification and bounded execution.
 - Portable C source generation for the supported numeric subset.
-- CPU parallel-for utility using standard C++ threads.
+- CPU parallel-for utility using standard C++ threads, including worker exception propagation.
 - Python model installer with pinned Hugging Face revisions, file allow-list, license acknowledgement and SHA-256 checks.
 - Local llama.cpp HTTP client, safe archive package manager and loopback browser Studio.
 - CI builds Linux, Windows, macOS and cross-builds Android arm64 with the NDK.
@@ -67,7 +67,7 @@ The package manager requires a registry entry with an HTTPS archive URL and SHA-
 
 ## Engineering status
 
-See ROADMAP.md for implementation status and docs/PLATFORM_SUPPORT.md for verified versus planned targets. GPU acceleration, full LLVM code generation, full standard library, language-level imports/modules, full debugger/profiler, and OS-level sandboxing remain future work.
+See ROADMAP.md for implementation status and docs/PLATFORM_SUPPORT.md for verified versus planned targets. Full LLVM code generation, a separate optimized SSA IR, GPU provider implementation, full standard library, language-level imports/modules, complete debugger/profiler, and OS-level sandboxing remain future work.
 
 ## License
 

@@ -1,8 +1,6 @@
-# TAVIQ Language Specification — Draft 0.2
+# TAVIQ Language Specification — Draft 0.3
 
-## Identity and source form
-
-TAVIQ source files use the .taviq extension; project configuration uses taviq.toml. A program has one entry block.
+## Source form
 
     program       = "flow" "main" "{" { statement } "}" ;
     statement     = declaration | display ;
@@ -11,20 +9,21 @@ TAVIQ source files use the .taviq extension; project configuration uses taviq.to
     expression    = term { ("+" | "-") term } ;
     term          = unary { ("*" | "/") unary } ;
     unary         = "-" unary | primary ;
-    primary       = number | string | identifier | "(" expression ")" ;
+    primary       = number | string | identifier [ "(" [ arguments ] ")" ] | "(" expression ")" ;
+    arguments     = expression { "," expression } ;
 
-## Current semantics
+## Implemented semantics
 
 - let declares an immutable local.
-- Numbers are parsed as decimal floating-point values.
-- Strings use double quotes and escapes for newline, tab, carriage return, quote and backslash.
-- +, -, * and / operate on numbers. String concatenation with + is supported by QVM.
+- Numbers are decimal floating-point values; strings use double quotes and common escapes.
+- Numeric +, -, * and / are supported. String concatenation with + is supported in QVM.
 - display prints one value and a newline.
-- Undefined names, duplicate declarations and invalid arithmetic types are rejected during compilation.
-- Division by zero is a runtime error.
+- len(string) returns UTF-8 byte length; sqrt(number) returns square root for non-negative input; abs(number) returns absolute value. Each accepts exactly one argument.
+- Undefined names, duplicate declarations and invalid built-in argument types are rejected during compilation.
+- Division by zero and invalid square-root inputs are runtime errors.
 
-## Deferred language features
+## Deferred features
 
-Functions, imports/modules, control flow, loops, pattern matching, generics, user-defined types, async tasks, language-level AI declarations, memory ownership and capability scopes are design targets, not part of the implemented grammar yet.
+User-defined functions, imports/modules, control flow, loops, pattern matching, generics, user-defined types, async tasks, language-level AI declarations, memory ownership and capability scopes are not implemented in this grammar yet.
 
-Identifiers in 0.2 are ASCII. Unicode identifiers require a separately specified normalization and anti-confusable policy.
+Identifiers are ASCII in version 0.3. Unicode identifiers require normalization and anti-confusable rules.
