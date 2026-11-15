@@ -138,6 +138,15 @@ int main(){
  std::vector<int> values(1000,0);
  taviq::parallelFor(0,values.size(),13,[&](std::size_t i){values[i]=static_cast<int>(i*i);},4);
  for(std::size_t i=0;i<values.size();++i)CHECK(values[i]==static_cast<int>(i*i));
+ std::size_t traced=0;
+ std::ostringstream traceOutput;
+ CHECK(taviq::VM{}.run(control,traceOutput,error,1000000,
+  [&](std::size_t,const taviq::Instruction&){++traced;})==0);
+ CHECK(traced>0);
+ traced=0;
+ CHECK(taviq::VM{}.run(control,traceOutput,error,1000000,
+  [&](std::size_t,const taviq::Instruction&){++traced;throw std::runtime_error("stop trace");})!=0);
+ CHECK(error.find("trace callback failed")!=std::string::npos);
  std::atomic<std::size_t> calls{0};
  taviq::parallelFor(0,0,0,[&](std::size_t){++calls;},1);CHECK(calls.load()==0);
  taviq::parallelFor(std::numeric_limits<std::size_t>::max()-1,std::numeric_limits<std::size_t>::max(),5,

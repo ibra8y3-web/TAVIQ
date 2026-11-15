@@ -51,6 +51,10 @@ def main():
         )
         structured_result = run([str(binary), "run", str(structured)], root)
         assert structured_result.stdout == "false\ntrue\nfalse\n"
+        traced = run([str(binary), "debug", str(structured)], root)
+        assert "TRACE " in traced.stderr
+        stopped = run([str(binary), "debug", str(structured), "0"], root)
+        assert "BREAK 0" in stopped.stderr
         structured_bytecode = root / "structured.tvqbc"
         run([str(binary), "compile", str(structured), "-o", str(structured_bytecode)], root)
         assert run([str(binary), "run-bytecode", str(structured_bytecode)], root).stdout == structured_result.stdout
