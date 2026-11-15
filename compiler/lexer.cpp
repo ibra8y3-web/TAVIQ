@@ -14,9 +14,11 @@ void Lexer::skipWhitespace(){
  else break;}
 }
 void Lexer::scanIdentifier(){
- const auto start=current_-1;while(std::isalnum(static_cast<unsigned char>(peek()))||peek()=='_')advance();
+ const auto start=current_-1;
+ while(std::isalnum(static_cast<unsigned char>(peek()))||peek()=='_')advance();
  auto word=source_.substr(start,current_-start);
  if(word=="flow")add(TokenKind::Flow,word);else if(word=="main")add(TokenKind::Main,word);
+ else if(word=="fn")add(TokenKind::Fn,word);else if(word=="return")add(TokenKind::Return,word);
  else if(word=="let")add(TokenKind::Let,word);else if(word=="var")add(TokenKind::Var,word);
  else if(word=="display")add(TokenKind::Display,word);else if(word=="if")add(TokenKind::If,word);
  else if(word=="else")add(TokenKind::Else,word);else if(word=="while")add(TokenKind::While,word);
@@ -53,10 +55,12 @@ std::vector<Token> Lexer::scan(){
    case '!':{const bool eq=match('=');add(eq?TokenKind::BangEqual:TokenKind::Bang,eq?"!=":"!");break;}
    case '<':{const bool eq=match('=');add(eq?TokenKind::LessEqual:TokenKind::Less,eq?"<=":"<");break;}
    case '>':{const bool eq=match('=');add(eq?TokenKind::GreaterEqual:TokenKind::Greater,eq?">=":">");break;}
-   case '+':add(TokenKind::Plus,"+");break;case '-':add(TokenKind::Minus,"-");break;
+   case '+':add(TokenKind::Plus,"+");break;
+   case '-':{const bool arrow=match('>');add(arrow?TokenKind::Arrow:TokenKind::Minus,arrow?"->":"-");break;}
    case '*':add(TokenKind::Star,"*");break;case '/':add(TokenKind::Slash,"/");break;
    case '"':scanString();break;
-   default:if(std::isalpha(static_cast<unsigned char>(c))||c=='_')scanIdentifier();
+   default:
+    if(std::isalpha(static_cast<unsigned char>(c))||c=='_')scanIdentifier();
     else if(std::isdigit(static_cast<unsigned char>(c)))scanNumber();
     else errors_.push_back("Line "+std::to_string(line_)+": unexpected character '"+std::string(1,c)+"'");
   }
