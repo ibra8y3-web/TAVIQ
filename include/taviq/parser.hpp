@@ -16,6 +16,7 @@ private:
     bool match(TokenKind kind);
     bool consume(TokenKind kind,const std::string& message);
     void synchronize();
+    Function functionDeclaration();
     Statement statement();
     Statement declaration(TokenKind kind);
     Statement assignment();
