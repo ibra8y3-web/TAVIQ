@@ -1,8 +1,12 @@
-# Platform Support Policy
+# Platform Support Matrix
 
-Targets: Windows, Linux, macOS, Android.
+| Platform | CI status | Scope |
+|---|---|---|
+| Linux x86_64 | build and tests | native C++20 CLI, QVM, Python tools |
+| Windows x64 | build and tests | native C++20 CLI, QVM, Python tools |
+| macOS | build and tests | native C++20 CLI, QVM, Python tools |
+| Android arm64-v8a | NDK cross-build | CLI target compilation only; no Android app wrapper or device execution test |
 
-Initial development host recommendation: Linux x86_64. CI should add Windows and
-macOS builds after the compiler has stable host-independent behavior. Android
-requires NDK toolchains, ABI packaging, and Android-specific filesystem/thread/
-dynamic-library policies. A target is supported only after CI builds and tests it.
+CI success does not imply that every OS integration is implemented. Filesystem, threads and process launching use portable standard APIs. Android-specific app lifecycle, storage permissions, JNI/API integration and device testing are still required before Android can be advertised as a runtime-supported application platform.
+
+GPU backends are not bundled. Accelerators must be tested on real devices and must pass correctness and fallback tests before support is declared.

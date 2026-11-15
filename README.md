@@ -2,63 +2,73 @@
 
 **Beyond Code. Beyond Limits.**
 
-TAVIQ is an independent, open-source programming-language project focused on AI-native computing,
-high-performance execution, safe runtimes, and cross-platform development.
+TAVIQ is an open-source programming-language project for AI-oriented and high-performance computing. This repository is an evolving implementation, not a claim that every planned subsystem is production-ready.
 
-> **Repository status:** Foundation / experimental prototype. This repository contains a real,
-> buildable C++20 command-line prototype and the architecture, specifications, module boundaries,
-> workflows, and implementation plans for the full language. It does not claim that all 16 systems
-> are production-complete.
+## What works
 
-## Current working prototype
+- C++20 frontend for flow main, let, numeric expressions, string literals and display.
+- Checks for undefined/duplicate variables and invalid arithmetic types.
+- QVM bytecode generation, versioned binary save/load, disassembly and bounded execution.
+- Portable C source generation for the supported numeric subset.
+- CPU parallel-for utility using standard C++ threads.
+- Python model installer with pinned Hugging Face revisions, file allow-list, license acknowledgement and SHA-256 checks.
+- Local llama.cpp HTTP client, safe archive package manager and loopback browser Studio.
+- CI builds Linux, Windows, macOS and cross-builds Android arm64 with the NDK.
 
-The first prototype recognizes and executes this small TAVIQ program:
+The native C backend emits portable C source; a host C compiler turns it into a machine executable. The optional provider ABI is a contract, not a bundled inference engine. GPU provider loading and a Vulkan/CUDA backend are not yet implemented. Android CI is a cross-build, not a physical-device runtime test.
 
-```taviq
-flow main {
-    display "Hello from TAVIQ";
-}
-```
+## Build
 
-Build:
+Requirements: CMake 3.20+, C++20 compiler, C compiler, and Python 3 for integration tests.
 
-```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --config Release
-./build/taviq examples/hello.taviq
-```
+    cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+    cmake --build build --parallel
+    ctest --test-dir build --output-on-failure
 
-On Windows, run `build/Release/taviq.exe examples/hello.taviq` when using a multi-config generator.
+## Language example
 
-## Repository map
+    flow main {
+        let base = 2 + 3 * 4;
+        let total = (base - 4) / 2;
+        display base;
+        display total * total;
+        display "Hello from TAVIQ";
+    }
 
-- `compiler/` — lexer, parser, syntax tree, semantic analysis, compiler driver.
-- `ir/` — TAVIQ Intermediate Representation design.
-- `runtime/` — initial execution engine and future VM contracts.
-- `ai/` — provider-neutral AI engine interfaces and security requirements.
-- `compute/` — parallel and accelerator abstractions.
-- `memory/` — memory model and ownership design.
-- `security/` — capability and sandbox specifications.
-- `stdlib/` — standard-library module contracts.
-- `package/` — package manager and registry design.
-- `tools/` — formatter, linter, debugger and profiler plans.
-- `studio/` — IDE architecture.
-- `platforms/` — Windows, Linux, macOS and Android integration.
-- `tests/` — executable prototype tests and future test suites.
-- `docs/` — language and engineering specifications.
-- `roadmap/` — 16 implementation stages.
-- `logo/` — original procedural 3D logo source (Blender Python), plus vector artwork.
+    build/taviq run examples/calculator.taviq
+    build/taviq check examples/calculator.taviq
+    build/taviq compile examples/calculator.taviq -o calculator.tvqbc
+    build/taviq disasm calculator.tvqbc
+    build/taviq run-bytecode calculator.tvqbc
+    build/taviq emit-c examples/calculator.taviq -o calculator.c
+    cc calculator.c -o calculator
 
-## Principles
+Windows multi-config builds usually place the executable at build/Release/taviq.exe.
 
-1. No fake implementations or fake success states.
-2. No claim of platform or model support without working implementation and verification.
-3. All external dependencies must be pinned, reviewed, and license-compatible.
-4. AI providers are adapters; TAVIQ does not depend on one vendor.
-5. The language specification is versioned.
-6. Security boundaries and permissions are explicit.
-7. Every implemented feature must have tests and documentation.
+## AI model workflow
+
+Review the model card and license first. The Hub installer resolves mutable refs to an immutable commit and installs selected model assets.
+
+    python tools/taviq_hub.py org/model --accept-license --file model.gguf
+
+Run a separately installed llama.cpp server bound to loopback, then call it.
+
+    python ai/taviq_ai.py --prompt "Explain this function" --endpoint http://127.0.0.1:8080
+
+Downloading model weights does not install or execute an inference engine. See docs/AI_HUB_SPEC.md.
+
+## Packages and Studio
+
+    python tools/taviq_pkg.py list
+    python tools/taviq_pkg.py install sample --version 1.0.0 --index ./registry-index.json
+    python studio/taviq_studio.py --root . --compiler build/taviq
+
+The package manager requires a registry entry with an HTTPS archive URL and SHA-256 digest. It never executes package install scripts.
+
+## Engineering status
+
+See ROADMAP.md for implementation status and docs/PLATFORM_SUPPORT.md for verified versus planned targets. GPU acceleration, full LLVM code generation, full standard library, language-level imports/modules, full debugger/profiler, and OS-level sandboxing remain future work.
 
 ## License
 
-Apache-2.0. See `LICENSE`. Third-party components retain their own licenses.
+Apache-2.0. Third-party dependencies and model weights retain their own licenses.

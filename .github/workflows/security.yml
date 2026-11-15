@@ -9,11 +9,33 @@ on:
 
 permissions:
   contents: read
+  security-events: write
+  actions: read
 
 jobs:
-  dependency-review:
-    if: github.event_name == 'pull_request'
+  source-checks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/dependency-review-action@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate Python tools
+        run: python -m compileall -q ai tools studio tests/python
+      - name: Python security lint
+        run: |
+          python -m pip install --disable-pip-version-check bandit
+          bandit -q -r ai tools studio -x tests
+      - name: Dependency review
+        if: github.event_name == 'pull_request'
+        uses: actions/dependency-review-action@v4
+
+  codeql:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: cpp, python
+      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/analyze@v3

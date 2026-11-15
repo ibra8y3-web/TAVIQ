@@ -1,11 +1,17 @@
 [project]
-name = "hello-taviq"
-version = "0.1.0"
-language_edition = "0.1"
+name = "taviq"
+version = "0.2.0"
+language_edition = "0.2"
 entry = "examples/hello.taviq"
 
 [build]
-backend = "prototype-interpreter"
+backend = "qvm"
 
-[dependencies]
-# Add reviewed, pinned dependencies here.
+[ai]
+hub = "huggingface"
+default_inference_provider = "llama.cpp"
+default_endpoint = "http://127.0.0.1:8080"
+
+[security]
+require_pinned_model_revision = true
+require_package_sha256 = true

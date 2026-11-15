@@ -1,0 +1,7 @@
+flow main {
+    let base = 2 + 3 * 4;
+    let total = (base - 4) / 2;
+    display base;
+    display total * total;
+    display "TAVIQ QVM is running";
+}

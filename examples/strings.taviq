@@ -1,0 +1,5 @@
+flow main {
+    let greeting = "Hello " + "from TAVIQ";
+    display greeting;
+    display "Bytecode and native C output are available";
+}

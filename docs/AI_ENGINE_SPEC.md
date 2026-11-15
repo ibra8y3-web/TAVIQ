@@ -1,31 +1,11 @@
-# TAVIQ Intelligence Engine (TIE) — Specification Draft
+# TAVIQ Intelligence Engine — Implementation Boundary
 
-## Goals
-Provider-neutral inference, model lifecycle management, streaming output, embeddings,
-tokenization, cancellation, observability, and explicit resource controls.
+The repository currently provides three separate pieces:
 
-## Provider contract (design)
-A provider adapter should expose:
-- discover capabilities
-- load/unload model
-- tokenize
-- infer
-- stream inference
-- create embeddings
-- cancel request
-- report resource usage
+1. A C ABI contract in ai/providers/taviq_provider.h for future native provider modules.
+2. tools/taviq_hub.py to fetch model/tokenizer assets from Hugging Face at an immutable revision.
+3. ai/taviq_ai.py to call a separately managed llama.cpp server over HTTP, loopback by default.
 
-Every operation returns a typed success/error result. Provider-specific errors are
-mapped to stable TAVIQ error categories while preserving diagnostic details.
+These pieces are not yet unified into an in-process inference engine or language-level AI syntax. The Python client does not install llama.cpp automatically. The model hub does not execute downloaded code. The native ABI is not dynamically loaded by the C++ runtime.
 
-## Model sources
-Local model files and remote API providers are supported by the architecture.
-No provider is bundled or enabled by default in this foundation scaffold.
-
-## Security
-Model files are untrusted input. Validate metadata, enforce size limits, isolate
-native runtimes where possible, and never execute downloaded model-adjacent code
-without explicit authorization.
-
-## Implementation status
-Specification only. No real inference adapter is included in prototype 0.1.
+The target API includes model load/unload, prompt generation, cancellation, streaming, embeddings, tokenizer access, usage metrics and resource limits. Native ABI loader, streaming, embeddings, model lifecycle and TAVIQ-language integration remain unimplemented.
