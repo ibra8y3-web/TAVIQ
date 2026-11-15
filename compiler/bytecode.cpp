@@ -340,6 +340,11 @@ bool verifySegment(const Bytecode& bytecode,std::size_t begin,std::size_t end,
                 if(!push(target.returnType))return fail("QVM live string memory exceeds 16 MiB");
                 break;
             }
+            case OpCode::Print: {
+                StackValue printed{};
+                if(!pop(printed))return fail("QVM PRINT underflows the operand stack");
+                break;
+            }
             case OpCode::Jump:
                 if(bytecode.formatVersion<2)return fail("QVM JUMP is not supported in this bytecode version");
                 fallsThrough=false;
@@ -587,6 +592,9 @@ bool verifyBytecode(const Bytecode& bytecode,std::string& error) {
         if(ins.op==OpCode::PushBoolean&&ins.slot>1){error="QVM v3 Boolean constant must be 0 or 1";return false;}
         if((ins.op==OpCode::Jump||ins.op==OpCode::JumpIfFalse)&&ins.slot>=bytecode.code.size()){error="QVM v3 jump target is out of range";return false;}
         if(ins.op==OpCode::Call&&ins.slot>=bytecode.functions.size()){error="QVM CALL target is out of range";return false;}
+        if(ins.op==OpCode::Call&&ins.argumentCount!=bytecode.functions[ins.slot].parameterTypes.size()){
+            error="QVM CALL argument count does not match function signature";return false;
+        }
     }
     if(!verifySegment(bytecode,0,bytecode.mainEnd,bytecode.locals,{},nullptr,true,error))return false;
     for(const auto& fn:bytecode.functions)
