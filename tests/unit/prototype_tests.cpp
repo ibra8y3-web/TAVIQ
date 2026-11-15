@@ -60,7 +60,11 @@ int main(){
  std::string generatedC;std::vector<std::string> nativeErrors;
  CHECK(taviq::emitC(native,generatedC,nativeErrors));
  CHECK(generatedC.find("sqrt(")!=std::string::npos);CHECK(generatedC.find("strlen(")!=std::string::npos);
- const auto unsupportedNative=parse("flow main { if (true) { display 1; } }");
+ const auto structuredNative=parse("flow main { var i=0; var total=0; while(i<4){ i=i+1; if(i==2){ total=total+10; } else { total=total+i; } } display total; display true and not false; }");
+ CHECK(taviq::emitC(structuredNative,generatedC,nativeErrors));
+ CHECK(generatedC.find("while (")!=std::string::npos);
+ CHECK(generatedC.find("if (")!=std::string::npos);
+ const auto unsupportedNative=parse("flow main { display \"a\"+\"b\"; }");
  CHECK(!taviq::emitC(unsupportedNative,generatedC,nativeErrors));
  const auto mismatchedNative=parse("flow main { let label: string=1; }");
  CHECK(!taviq::emitC(mismatchedNative,generatedC,nativeErrors));nativeErrors.clear();

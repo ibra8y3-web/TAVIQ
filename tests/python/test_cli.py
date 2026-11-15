@@ -85,6 +85,35 @@ def main():
             raise AssertionError("native C executable not found")
         native = run([str(executable)], root)
         assert "12" in native.stdout and "3" in native.stdout
+
+        structured_native = root / "structured-native.taviq"
+        structured_native.write_text(
+            'flow main { var i=0; var total=0; while(i<4){ i=i+1; if(i==2){total=total+10;}else{total=total+i;} } display total; display true and not false; }\\n',
+            encoding="utf-8"
+        )
+        structured_c = root / "structured-native.c"
+        run([str(binary), "emit-c", str(structured_native), "-o", str(structured_c)], root)
+        structured_source = root / "structured-native-source"
+        structured_build = root / "structured-native-build"
+        structured_source.mkdir()
+        (structured_source / "main.c").write_text(structured_c.read_text(encoding="utf-8"), encoding="utf-8")
+        (structured_source / "CMakeLists.txt").write_text(
+            "cmake_minimum_required(VERSION 3.20)\\nproject(TAVIQStructuredNative LANGUAGES C)\\n"
+            "add_executable(taviq_structured_native main.c)\\n"
+            "if(NOT MSVC)\\n target_link_libraries(taviq_structured_native PRIVATE m)\\nendif()\\n",
+            encoding="utf-8"
+        )
+        run(["cmake", "-S", str(structured_source), "-B", str(structured_build),
+             "-DCMAKE_BUILD_TYPE=Release"], root)
+        run(["cmake", "--build", str(structured_build), "--config", "Release", "--parallel"], root)
+        native_candidates = [structured_build / "Release" / "taviq_structured_native.exe",
+            structured_build / "taviq_structured_native.exe", structured_build / "Release" / "taviq_structured_native",
+            structured_build / "taviq_structured_native"]
+        native_executable = next((p for p in native_candidates if p.is_file()), None)
+        if native_executable is None:
+            raise AssertionError("structured native executable not found")
+        structured_result = run([str(native_executable)], root)
+        assert structured_result.stdout == "18\\ntrue\\n"
     return 0
 
 if __name__ == "__main__":

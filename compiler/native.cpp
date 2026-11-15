@@ -178,7 +178,7 @@ bool emitStatements(const std::vector<Statement>& statements,Context& c,
    const bool immutable=statement.kind==Statement::Kind::Let;
    const std::string cType=type==Type::Number?"double":(type==Type::Boolean?"int":"const char*");
    c.code<<pad<<"  ";
-   if(immutable)c.code<<"const ";
+   if(immutable&&type!=Type::String)c.code<<"const ";
    c.code<<cType;
    if(immutable&&type==Type::String)c.code<<" const";
    c.code<<" "<<symbol<<" = "<<expression<<";\n";
