@@ -14,6 +14,10 @@ The QVM uses a versioned binary bytecode container. It checks format version, op
 
 The CPU compute helper offers a bounded, exception-propagating parallel-for utility. The GPU host loads a versioned native provider. An optional OpenCL module implements float32 vector addition using OpenCL GPU devices where available and an explicitly labelled OpenCL CPU fallback otherwise. Vulkan, CUDA and Metal providers are not bundled.
 
+## Package installation boundary
+
+The package manager solves semantic-version constraints for the transitive package graph, stages all required HTTPS archives, verifies SHA-256 values, rejects unsafe archive paths and links, and only replaces installed package trees after every artifact has been verified and extracted. Directory changes are rolled back if the commit step fails, and the lockfile is atomically replaced. Package-provided installation scripts are never executed. Registry publishing and a hosted discovery service are separate future components.
+
 ## AI integration
 
 The AI Hub is a Python asset installer, not an inference runtime. It pins model refs to a Hub commit and verifies LFS SHA-256 where supplied. ai/taviq_ai.py talks to a separately launched llama.cpp server over loopback HTTP. The native provider host defines a trusted extension point but no in-process inference engine is bundled.
