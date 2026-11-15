@@ -146,22 +146,29 @@ int VM::run(const Bytecode& bytecode,std::ostream& output,std::string& error,
             case OpCode::Multiply:
             case OpCode::Divide: {
                 if(stack.size()<frameBase+2)return fail("QVM arithmetic stack underflow");
-                Value rhs=std::move(stack.back());stack.pop_back();
-                Value lhs=std::move(stack.back());stack.pop_back();
-                if(ins.op==OpCode::Add&&std::holds_alternative<std::string>(lhs)&&
-                   std::holds_alternative<std::string>(rhs)) {
-                    const auto& left=std::get<std::string>(lhs);
-                    const auto& right=std::get<std::string>(rhs);
+                if(ins.op==OpCode::Add&&
+                   std::holds_alternative<std::string>(stack[stack.size()-2])&&
+                   std::holds_alternative<std::string>(stack.back())) {
+                    const auto& left=std::get<std::string>(stack[stack.size()-2]);
+                    const auto& right=std::get<std::string>(stack.back());
                     if(left.size()>MaxStringBytes||right.size()>MaxStringBytes-left.size())
                         return fail("QVM string concatenation exceeds 16 MiB");
-                    const auto before=memoryUsed();
-                    if(left.size()+right.size()>MaxStringBytes-before)
+                    const auto liveBefore=memoryUsed();
+                    const auto resultSize=left.size()+right.size();
+                    if(liveBefore>MaxStringBytes||resultSize>MaxStringBytes-liveBefore)
                         return fail("QVM string concatenation peak memory exceeds 16 MiB");
-                    std::string joined;joined.reserve(left.size()+right.size());
-                    joined.append(left);joined.append(right);stack.emplace_back(std::move(joined));
+                    std::string joined;
+                    joined.reserve(resultSize);
+                    joined.append(left);
+                    joined.append(right);
+                    stack.pop_back();
+                    stack.pop_back();
+                    stack.emplace_back(std::move(joined));
                     if(memoryUsed()>MaxStringBytes)return fail("QVM live string memory exceeds 16 MiB");
                     break;
                 }
+                Value rhs=std::move(stack.back());stack.pop_back();
+                Value lhs=std::move(stack.back());stack.pop_back();
                 if(!std::holds_alternative<double>(lhs)||!std::holds_alternative<double>(rhs))
                     return fail("QVM arithmetic operands must be numbers");
                 const double left=std::get<double>(lhs),right=std::get<double>(rhs);
