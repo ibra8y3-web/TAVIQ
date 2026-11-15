@@ -1,24 +1,24 @@
 # TAVIQ Engineering Roadmap
 
-Status reflects code merged into the default branch and completed CI evidence, not directory names or specifications.
+Status reflects code and CI evidence on the default branch, not directory names or specifications.
 
 | Stage | Scope | Current status | Remaining work |
 |---|---|---|---|
 | 01 | Foundation/build | implemented | signed reproducible releases |
-| 02 | Frontend | implemented - subset | functions, conditions, loops, modules, Unicode identifiers |
-| 03 | Type system | implemented - subset | booleans, user types, generics and richer inference |
-| 04 | IR | implemented - QVM instruction IR | SSA IR and optimization passes |
-| 05 | QVM | implemented - v1 verified subset | fuzzing and control-flow-aware verification |
-| 06 | Native backend | implemented - C lowering subset | LLVM backend and broader lowering |
-| 07 | Runtime | in progress | managed memory, ownership, OS abstraction and concurrency |
-| 08 | AI | in progress | native inference/provider loader, streaming, embeddings |
-| 09 | Compute | in progress | GPU provider host ABI/loader implemented; production Vulkan/CUDA/Metal providers and device tests remain |
-| 10 | Security | in progress | OS sandbox, capability enforcement and plugin signatures/isolation |
+| 02 | Frontend | implemented - expanded subset | user-defined functions, parameters, returns, imports/modules, arrays, structs and Unicode identifiers |
+| 03 | Type system | implemented - number/string/Boolean subset | explicit types, structs, generics, inference and richer diagnostics |
+| 04 | IR | implemented - QVM instruction IR | standalone SSA IR and optimization passes |
+| 05 | QVM | implemented - v2 CFG verifier and v1 loader | coverage-guided fuzzing, source maps, calls/closures and richer opcodes |
+| 06 | Native backend | implemented - C lowering subset | LLVM backend, optimization and control-flow lowering |
+| 07 | Runtime | in progress | managed heap, GC/ownership, OS abstraction and structured concurrency |
+| 08 | AI | in progress | bundled native inference engine, streaming, embeddings and model lifecycle API |
+| 09 | Compute | implemented - provider host loader | production Vulkan/CUDA/Metal providers, scheduling and real-device validation |
+| 10 | Security | in progress | OS sandbox, capability enforcement, signed providers and plugin isolation |
 | 11 | Standard library | implemented - initial intrinsics | collections, IO, filesystem, networking, time, async and AI modules |
-| 12 | Packages | implemented - local registry flow | public registry, signatures and dependency solving |
-| 13 | Developer tools | implemented - initial CLI set | LSP, debugger, source maps and sampling profiler |
-| 14 | Platforms | implemented - CI builds | Android app wrapper and physical-device runtime validation |
-| 15 | Studio | implemented - initial loopback editor | language services, project model and integrated debugger |
-| 16 | Release engineering | in progress | signed binaries, reproducible builds, SBOM and promotion automation |
+| 12 | Packages | implemented - local registry flow | public registry, signatures, dependency solving and publication |
+| 13 | Developer tools | implemented - formatter/linter/inspector/basic profiler | LSP, debugger, breakpoints, source maps and sampling profiler |
+| 14 | Platforms | implemented - CI builds | Android application/JNI layer and physical-device runtime validation |
+| 15 | Studio | implemented - initial loopback editor | project model, language services, debugger integration and production UX |
+| 16 | Release engineering | in progress | signed binaries, reproducible builds, SBOM and release promotion automation |
 
-Provider loading executes native code from the explicitly named library. Only load trusted providers. The loader is an ABI host, not a bundled GPU implementation.
+The current native C backend deliberately rejects if, else and while; those constructs currently execute through QVM v2. The current AI client requires a separate inference service. GPU provider loading is implemented, but production accelerator modules are not bundled.

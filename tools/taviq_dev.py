@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TAVIQ developer tools: formatter, compiler-backed linter, bytecode inspector and profiler."""
+"""TAVIQ source formatter, compiler-backed linter, bytecode inspector and profiler."""
 import argparse
 from pathlib import Path
 import re
@@ -9,7 +9,11 @@ import sys
 import tempfile
 import time
 
-TOKEN = re.compile(r'"(?:\\.|[^"\\])*"|[A-Za-z_][A-Za-z0-9_]*|(?:\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|[{}();,+*/=-]')
+TOKEN = re.compile(
+    r'"(?:\\.|[^"\\])*"|==|!=|<=|>=|'
+    r'[A-Za-z_][A-Za-z0-9_]*|(?:\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|[{}();,+*/=!<>-]'
+)
+BINARY_OPERATORS = {"=", "==", "!=", "<", "<=", ">", ">=", "+", "-", "*", "/", "and", "or"}
 
 def tokenize(source):
     tokens = []
@@ -29,66 +33,90 @@ def tokenize(source):
         i = match.end()
     return tokens
 
-def render_statement(tokens):
-    out = ""
-    previous = None
-    operators = {"=", "+", "-", "*", "/"}
-    for token in tokens:
-        if token in operators:
-            out = out.rstrip() + " " + token + " "
-        elif token == "(":
-            if previous and (re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", previous)):
-                if previous in {"display", "let"}:
-                    out = out.rstrip() + " "
-            elif previous and previous not in operators and previous != ",":
-                out = out.rstrip() + " "
-            out += "("
-        elif token == ")":
-            out = out.rstrip() + ")"
-        elif token == ",":
-            out = out.rstrip() + ", "
-        else:
-            if out and previous not in {"(", ",", *operators}:
-                out += " "
-            out += token
-        previous = token
-    return out.strip()
-
 def format_source(source):
     tokens = tokenize(source)
     if len(tokens) < 4 or tokens[:3] != ["flow", "main", "{"] or tokens[-1] != "}":
         raise ValueError("formatter: expected one flow main block")
-    body = tokens[3:-1]
-    statements = []
-    current = []
-    depth = 0
-    for token in body:
-        if token == "(":
-            depth += 1
-        elif token == ")":
-            depth -= 1
-            if depth < 0:
-                raise ValueError("formatter: unmatched ')' ")
-        if token == ";" and depth == 0:
-            if not current:
-                raise ValueError("formatter: empty statement")
-            statements.append(render_statement(current) + ";")
-            current = []
-        else:
-            current.append(token)
-    if depth != 0:
-        raise ValueError("formatter: unbalanced parentheses")
-    if current:
-        raise ValueError("formatter: statement is missing ';'")
+
     lines = ["flow main {"]
-    lines.extend("    " + statement for statement in statements)
+    indent = 1
+    current = ""
+    previous = None
+    paren_depth = 0
+
+    def emit(text):
+        lines.append(("    " * indent) + text.strip())
+
+    for index, token in enumerate(tokens[3:-1], start=3):
+        next_token = tokens[index + 1] if index + 1 < len(tokens) else None
+
+        if token == "(":
+            if previous in {"if", "while", "display", "let", "var"}:
+                current = current.rstrip() + " "
+            current += "("
+            paren_depth += 1
+        elif token == ")":
+            paren_depth -= 1
+            if paren_depth < 0:
+                raise ValueError("formatter: unmatched ')'")
+            current = current.rstrip() + ")"
+        elif token == "{":
+            if not current.strip():
+                raise ValueError("formatter: unexpected '{'")
+            emit(current.rstrip() + " {")
+            indent += 1
+            current = ""
+        elif token == "}":
+            if current.strip():
+                emit(current)
+                current = ""
+            indent -= 1
+            if indent < 1:
+                raise ValueError("formatter: unmatched '}'")
+            current = "}"
+            if next_token != "else":
+                emit(current)
+                current = ""
+        elif token == "else":
+            if current == "}":
+                current += " else"
+            elif not current:
+                current = "else"
+            else:
+                raise ValueError("formatter: unexpected else")
+        elif token == ";":
+            if not current.strip():
+                raise ValueError("formatter: empty statement")
+            emit(current.rstrip() + ";")
+            current = ""
+        elif token == ",":
+            current = current.rstrip() + ", "
+        elif token in BINARY_OPERATORS:
+            current = current.rstrip() + " " + token + " "
+        elif token == "!":
+            current = current.rstrip() + "!"
+        else:
+            if current and previous not in {"(", ",", "!", *BINARY_OPERATORS}:
+                current += " "
+            current += token
+
+        previous = token
+
+    if paren_depth != 0:
+        raise ValueError("formatter: unbalanced parentheses")
+    if current.strip():
+        if current == "}":
+            emit(current)
+        else:
+            raise ValueError("formatter: statement is missing ';'")
+    if indent != 1:
+        raise ValueError("formatter: unbalanced braces")
     lines.append("}")
     return "\n".join(lines) + "\n"
 
 def run_compiler(compiler, command, source, timeout=60):
-    result = subprocess.run([str(compiler), command, str(source)], text=True,
-                            capture_output=True, timeout=timeout, check=False)
-    return result
+    return subprocess.run([str(compiler), command, str(source)], text=True,
+                          capture_output=True, timeout=timeout, check=False)
 
 def main():
     parser = argparse.ArgumentParser(description="TAVIQ source formatter, linter, inspector and profiler")
@@ -98,7 +126,7 @@ def main():
     fmt.add_argument("source")
     fmt.add_argument("--check", action="store_true", help="fail when formatting changes are required")
 
-    lint = sub.add_parser("lint", help="run the actual compiler parser/type checker")
+    lint = sub.add_parser("lint", help="run the compiler parser/type checker")
     lint.add_argument("source")
     lint.add_argument("--compiler", default="build/taviq")
 
@@ -126,9 +154,9 @@ def main():
                     return 1
                 print("format ok:", source)
                 return 0
-            temp = source.with_name(source.name + ".taviq-format-part")
-            temp.write_text(formatted, encoding="utf-8")
-            temp.replace(source)
+            temporary = source.with_name(source.name + ".taviq-format-part")
+            temporary.write_text(formatted, encoding="utf-8")
+            temporary.replace(source)
             print("formatted:", source)
             return 0
 
@@ -147,13 +175,17 @@ def main():
         if args.command == "inspect":
             with tempfile.TemporaryDirectory(prefix="taviq-inspect-") as directory:
                 bytecode = Path(directory) / "program.tvqbc"
-                compiled = subprocess.run([str(compiler), "compile", str(source), "-o", str(bytecode)],
-                                          text=True, capture_output=True, timeout=60, check=False)
+                compiled = subprocess.run(
+                    [str(compiler), "compile", str(source), "-o", str(bytecode)],
+                    text=True, capture_output=True, timeout=60, check=False
+                )
                 if compiled.returncode != 0:
                     sys.stderr.write(compiled.stderr)
                     return compiled.returncode
-                result = subprocess.run([str(compiler), "disasm", str(bytecode)],
-                                        text=True, capture_output=True, timeout=60, check=False)
+                result = subprocess.run(
+                    [str(compiler), "disasm", str(bytecode)],
+                    text=True, capture_output=True, timeout=60, check=False
+                )
                 sys.stdout.write(result.stdout)
                 sys.stderr.write(result.stderr)
                 return result.returncode

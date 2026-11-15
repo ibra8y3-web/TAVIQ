@@ -33,6 +33,20 @@ def main():
         assert "LENGTH" in run([sys.executable, str(dev), "inspect", str(source), "--compiler", str(binary)], root).stdout
         assert "profile runs=3" in run([sys.executable, str(dev), "profile", str(source), "--compiler", str(binary), "--runs", "3"], root).stdout
 
+        structured = root / "structured.taviq"
+        structured.write_text(
+            'flow main { var n=0; while(n<3){ n=n+1; if(n==2){display true;}else{display false;} } }\n',
+            encoding="utf-8"
+        )
+        structured_result = run([str(binary), "run", str(structured)], root)
+        assert structured_result.stdout == "false\ntrue\nfalse\n"
+        structured_bytecode = root / "structured.tvqbc"
+        run([str(binary), "compile", str(structured), "-o", str(structured_bytecode)], root)
+        assert run([str(binary), "run-bytecode", str(structured_bytecode)], root).stdout == structured_result.stdout
+        run([sys.executable, str(dev), "format", str(structured)], root)
+        run([sys.executable, str(dev), "format", "--check", str(structured)], root)
+        run([sys.executable, str(dev), "lint", str(structured), "--compiler", str(binary)], root)
+
         generated_c = root / "smoke.c"
         run([str(binary), "emit-c", str(source), "-o", str(generated_c)], root)
         native_source = root / "native-source"
