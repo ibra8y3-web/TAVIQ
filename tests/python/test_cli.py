@@ -88,7 +88,7 @@ def main():
 
         structured_native = root / "structured-native.taviq"
         structured_native.write_text(
-            'flow main { var i=0; var total=0; while(i<4){ i=i+1; if(i==2){total=total+10;}else{total=total+i;} } display total; display true and not false; }\\n',
+            'flow main { var i=0; var total=0; while(i<4){ i=i+1; if(i==2){total=total+10;}else{total=total+i;} } display total; display true and not false; }\n',
             encoding="utf-8"
         )
         structured_c = root / "structured-native.c"
@@ -98,9 +98,9 @@ def main():
         structured_source.mkdir()
         (structured_source / "main.c").write_text(structured_c.read_text(encoding="utf-8"), encoding="utf-8")
         (structured_source / "CMakeLists.txt").write_text(
-            "cmake_minimum_required(VERSION 3.20)\\nproject(TAVIQStructuredNative LANGUAGES C)\\n"
+            "cmake_minimum_required(VERSION 3.20)\nproject(TAVIQStructuredNative LANGUAGES C)\\n"
             "add_executable(taviq_structured_native main.c)\\n"
-            "if(NOT MSVC)\\n target_link_libraries(taviq_structured_native PRIVATE m)\\nendif()\\n",
+            "if(NOT MSVC)\n target_link_libraries(taviq_structured_native PRIVATE m)\nendif()\\n",
             encoding="utf-8"
         )
         run(["cmake", "-S", str(structured_source), "-B", str(structured_build),
