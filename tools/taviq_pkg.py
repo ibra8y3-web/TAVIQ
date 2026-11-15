@@ -225,6 +225,143 @@ def resolve_dependencies(index, root_name, root_version):
         raise ValueError("dependency constraints cannot be resolved for %s@%s" % (root_name, root_version))
     return dict(sorted(solution.items()))
 
+def install_resolution(root, index, resolution, lock, index_reference, root_name, root_version, force=False):
+    """Download, verify and stage the complete resolved dependency graph before changing installs."""
+    root = Path(root).resolve()
+    private_root = root / ".taviq"
+    package_root = private_root / "packages"
+    if private_root.is_symlink() or package_root.is_symlink():
+        raise ValueError("refusing to install through a symlinked TAVIQ package directory")
+    package_root.mkdir(parents=True, exist_ok=True)
+    package_root.resolve().relative_to(root)
+
+    packages_index = index.get("packages", {})
+    lock_packages = lock.setdefault("packages", {})
+    if not isinstance(packages_index, dict) or not isinstance(lock_packages, dict):
+        raise ValueError("registry packages and lock packages must be objects")
+    prepared = []
+    already_installed = []
+    canonical_index = json.dumps(index, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    registry_sha256 = hashlib.sha256(canonical_index).hexdigest()
+
+    # Stage and verify every missing package first; a failed download leaves existing installs untouched.
+    with tempfile.TemporaryDirectory(prefix="taviq-pkg-transaction-", dir=package_root) as temporary:
+        transaction = Path(temporary)
+        staging_root = transaction / "staged"
+        archives_root = transaction / "archives"
+        backups_root = transaction / "backups"
+
+        for package_name, package_version in sorted(resolution.items()):
+            package_name = valid_name(package_name)
+            package_version = valid_version(package_version)
+            entry = packages_index.get(package_name, {}).get("versions", {}).get(package_version)
+            if not isinstance(entry, dict):
+                raise ValueError("package/version not found in registry index: %s@%s" %
+                                 (package_name, package_version))
+            url = entry.get("url")
+            raw_digest = entry.get("sha256", "")
+            expected = raw_digest.lower() if isinstance(raw_digest, str) else ""
+            if not isinstance(url, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
+                raise ValueError("registry entry must supply an HTTPS archive URL and SHA-256 for %s@%s" %
+                                 (package_name, package_version))
+
+            package_directory = package_root / package_name
+            if package_directory.is_symlink():
+                raise ValueError("refusing to install through a package symlink: " + package_name)
+            destination = package_directory / package_version
+            if destination.is_symlink():
+                raise ValueError("refusing to replace a symlinked package directory: %s@%s" %
+                                 (package_name, package_version))
+            installed_versions = lock_packages.get(package_name, {})
+            if not isinstance(installed_versions, dict):
+                raise ValueError("invalid lock entries for package " + package_name)
+            existing = installed_versions.get(package_version)
+            dependencies = entry.get("dependencies", {})
+            if not isinstance(dependencies, dict):
+                raise ValueError("dependencies for %s@%s must be an object" %
+                                 (package_name, package_version))
+            if destination.is_dir() and isinstance(existing, dict) and existing.get("sha256") == expected and not force:
+                existing.update({
+                    "source": url,
+                    "path": str(destination.relative_to(root)),
+                    "dependencies": dict(sorted(dependencies.items())),
+                    "registry_sha256": registry_sha256,
+                })
+                already_installed.append(package_name + "@" + package_version)
+                continue
+            if destination.exists() and not force:
+                raise ValueError("package directory already exists without a matching lock entry: %s@%s; pass --force to replace it" %
+                                 (package_name, package_version))
+
+            archive = archives_root / package_name / (package_version + ".archive")
+            archive.parent.mkdir(parents=True, exist_ok=True)
+            download(url, archive)
+            if digest(archive) != expected:
+                raise ValueError("archive SHA-256 mismatch for %s@%s" %
+                                 (package_name, package_version))
+            staged = staging_root / package_name / package_version
+            extract_archive(archive, staged)
+            prepared.append((package_name, package_version, url, expected, entry, staged, destination))
+
+        # Commit directory renames as one recoverable transaction.
+        backups = []
+        installed_now = []
+        try:
+            for package_name, package_version, url, expected, entry, staged, destination in prepared:
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                if destination.exists():
+                    backup = backups_root / package_name / package_version
+                    backup.parent.mkdir(parents=True, exist_ok=True)
+                    os.replace(destination, backup)
+                    backups.append((destination, backup))
+                os.replace(staged, destination)
+                installed_now.append(destination)
+
+            for package_name, package_version, url, expected, entry, staged, destination in prepared:
+                dependencies = entry["dependencies"]
+                lock_packages.setdefault(package_name, {})[package_version] = {
+                    "sha256": expected,
+                    "source": url,
+                    "path": str(destination.relative_to(root)),
+                    "dependencies": dict(sorted(dependencies.items())),
+                    "registry_sha256": registry_sha256,
+                }
+
+            lock["resolution"] = {
+                "root": {"name": valid_name(root_name), "version": valid_version(root_version)},
+                "packages": dict(sorted(resolution.items())),
+                "registry_sha256": registry_sha256,
+                "registry": index_reference,
+            }
+            lock_path = root / "taviq.lock"
+            temporary_lock = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    mode="w", encoding="utf-8", dir=root,
+                    prefix=".taviq-lock-", suffix=".part", delete=False
+                ) as stream:
+                    temporary_lock = Path(stream.name)
+                    json.dump(lock, stream, indent=2, sort_keys=True)
+                    stream.write("\n")
+                os.replace(temporary_lock, lock_path)
+                temporary_lock = None
+            finally:
+                if temporary_lock is not None:
+                    temporary_lock.unlink(missing_ok=True)
+        except Exception:
+            for destination in reversed(installed_now):
+                if destination.exists() and not destination.is_symlink():
+                    shutil.rmtree(destination)
+            for destination, backup in reversed(backups):
+                if backup.exists():
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    os.replace(backup, destination)
+            raise
+
+    return [package + "@" + package_version for package, package_version in sorted(resolution.items())
+            if package + "@" + package_version not in already_installed], already_installed
+
+
 def verify_index_signature(index_reference, signature_reference, public_key):
     if not public_key or not signature_reference:
         raise ValueError("a public key and detached signature are required")
@@ -318,33 +455,17 @@ def main():
                 print(package+"@"+resolved_version)
             return 0
         if args.require_signature:
-            index = verify_index_signature(args.index,args.signature,args.public_key)
+            index = verify_index_signature(args.index, args.signature, args.public_key)
         else:
             index = load_index(args.index)
-        entry = index.get("packages", {}).get(name, {}).get("versions", {}).get(version)
-        if not isinstance(entry, dict):
-            raise ValueError("package/version not found in registry index")
-        url, expected = entry.get("url"), entry.get("sha256", "").lower()
-        if not isinstance(url, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
-            raise ValueError("registry entry must supply an HTTPS archive URL and SHA-256")
-        dest = package_root / name / version
-        if dest.exists() and not args.force:
-            raise ValueError("package is already installed; pass --force to replace it")
-        package_root.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(prefix="taviq-pkg-", dir=package_root) as temp:
-            tmpdir = Path(temp); archive = tmpdir / "package.archive"
-            download(url, archive)
-            actual = digest(archive)
-            if actual != expected:
-                raise ValueError("archive SHA-256 mismatch")
-            staging = tmpdir / "contents"; extract_archive(archive, staging)
-            if dest.exists():
-                shutil.rmtree(dest)
-            dest.parent.mkdir(parents=True, exist_ok=True); os.replace(staging, dest)
-        lock.setdefault("packages", {}).setdefault(name, {})[version] = {
-            "sha256": expected, "source": url, "path": str(dest.relative_to(root))}
-        tmp = lock_path.with_suffix(".lock.part"); tmp.write_text(json.dumps(lock, indent=2), encoding="utf-8"); os.replace(tmp, lock_path)
-        print("installed", name + "@" + version, "without executing package scripts")
+        installed, already_installed = install_resolution(
+            root, index, resolve_dependencies(index, name, version), lock, args.index,
+            name, version, args.force
+        )
+        for package in already_installed:
+            print("already installed", package)
+        for package in installed:
+            print("installed", package, "without executing package scripts")
         return 0
     except (OSError, ValueError, KeyError, tarfile.TarError, zipfile.BadZipFile,
             urllib.error.URLError, json.JSONDecodeError) as exc:

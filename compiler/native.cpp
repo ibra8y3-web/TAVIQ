@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <utility>
 namespace taviq {
+bool emitCWithFunctions(const Program&,std::string&,std::vector<std::string>&);
 namespace {
 enum class Type{Number,String,Boolean};
 struct Binding{std::string symbol;Type type;bool mutableLocal;};
@@ -222,7 +223,7 @@ bool emitStatements(const std::vector<Statement>& statements,Context& c,
 }
 }
 bool emitC(const Program& program,std::string& output,std::vector<std::string>& errors){
- if(!program.functions.empty()){errors.push_back("native C backend does not yet lower user-defined functions");return false;}
+ if(!program.functions.empty())return emitCWithFunctions(program,output,errors);
  Context context;
  if(!emitStatements(program.statements,context,1,false)||!context.errors.empty()){
   errors.insert(errors.end(),context.errors.begin(),context.errors.end());return false;
