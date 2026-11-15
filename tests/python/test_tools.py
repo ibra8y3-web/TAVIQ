@@ -108,6 +108,110 @@ class ToolSafetyTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             pkg.resolve_dependencies(index,"app","1.0.0")
 
+    def test_install_resolved_dependencies_transactionally(self):
+        import hashlib
+        import json
+        import shutil
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            archives = {}
+            index = {"packages": {}}
+            payloads = {
+                "app": ("app.bin", b"application"),
+                "lib": ("lib.bin", b"library"),
+                "codec": ("codec.bin", b"codec"),
+            }
+            dependencies = {
+                "app": {"lib": "^1.0.0"},
+                "lib": {"codec": "^2.0.0"},
+                "codec": {},
+            }
+            for name, (filename, payload) in payloads.items():
+                archive = root / (name + ".zip")
+                with zipfile.ZipFile(archive, "w") as bundle:
+                    bundle.writestr("package/" + filename, payload)
+                url = "https://registry.invalid/" + name + ".zip"
+                archives[url] = archive
+                index["packages"][name] = {"versions": {
+                    {"app": "1.0.0", "lib": "1.1.0", "codec": "2.0.0"}[name]: {
+                        "url": url,
+                        "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
+                        "dependencies": dependencies[name],
+                    }
+                }}
+
+            def fake_download(url, destination):
+                shutil.copyfile(archives[url], destination)
+
+            lock = {"format": 1, "packages": {}}
+            resolved = pkg.resolve_dependencies(index, "app", "1.0.0")
+            with patch.object(pkg, "download", side_effect=fake_download) as mocked:
+                installed, existing = pkg.install_resolution(
+                    root, index, resolved, lock, "https://registry.invalid/index.json",
+                    "app", "1.0.0"
+                )
+                self.assertEqual(mocked.call_count, 3)
+            self.assertEqual(installed, ["app@1.0.0", "codec@2.0.0", "lib@1.1.0"])
+            self.assertEqual(existing, [])
+            self.assertEqual(lock["resolution"]["root"], {"name": "app", "version": "1.0.0"})
+            for name, (filename, payload) in payloads.items():
+                installed_file = root / ".taviq" / "packages" / name / {
+                    "app": "1.0.0", "lib": "1.1.0", "codec": "2.0.0"
+                }[name] / "package" / filename
+                self.assertEqual(installed_file.read_bytes(), payload)
+
+            lock_path = root / "taviq.lock"
+            persisted = json.loads(lock_path.read_text(encoding="utf-8"))
+            self.assertEqual(persisted["resolution"]["packages"], resolved)
+            with patch.object(pkg, "download", side_effect=AssertionError("installed package was downloaded")):
+                installed_again, existing_again = pkg.install_resolution(
+                    root, index, resolved, persisted, "https://registry.invalid/index.json",
+                    "app", "1.0.0"
+                )
+            self.assertEqual(installed_again, [])
+            self.assertEqual(len(existing_again), 3)
+
+    def test_install_resolution_download_failure_changes_nothing(self):
+        import hashlib
+        import shutil
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            archive = root / "app.zip"
+            with zipfile.ZipFile(archive, "w") as bundle:
+                bundle.writestr("app.txt", "ready")
+            index = {"packages": {
+                "app": {"versions": {"1.0.0": {
+                    "url": "https://registry.invalid/app.zip",
+                    "sha256": hashlib.sha256(archive.read_bytes()).hexdigest(),
+                    "dependencies": {"lib": "^1.0.0"},
+                }}},
+                "lib": {"versions": {"1.0.0": {
+                    "url": "https://registry.invalid/lib.zip",
+                    "sha256": "0" * 64,
+                    "dependencies": {},
+                }}},
+            }}
+            def fake_download(url, destination):
+                if url.endswith("/app.zip"):
+                    shutil.copyfile(archive, destination)
+                else:
+                    destination.write_bytes(b"corrupt archive")
+            lock = {"format": 1, "packages": {}}
+            resolved = pkg.resolve_dependencies(index, "app", "1.0.0")
+            with patch.object(pkg, "download", side_effect=fake_download):
+                with self.assertRaisesRegex(ValueError, "SHA-256 mismatch"):
+                    pkg.install_resolution(
+                        root, index, resolved, lock, "https://registry.invalid/index.json",
+                        "app", "1.0.0"
+                    )
+            self.assertFalse((root / ".taviq" / "packages" / "app" / "1.0.0").exists())
+            self.assertFalse((root / ".taviq" / "packages" / "lib" / "1.0.0").exists())
+            self.assertFalse((root / "taviq.lock").exists())
+
     def test_zip_extraction(self):
         with tempfile.TemporaryDirectory() as d:
             root = Path(d); archive = root / "package.zip"
