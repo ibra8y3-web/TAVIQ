@@ -13,7 +13,7 @@ void Parser::synchronize(){
     while(!check(TokenKind::End)&&!check(TokenKind::RightBrace)){
         if(current_>0&&tokens_[current_-1].kind==TokenKind::Semicolon)return;
         if(check(TokenKind::Let)||check(TokenKind::Var)||check(TokenKind::Display)||
-           check(TokenKind::If)||check(TokenKind::While)||check(TokenKind::Identifier))return;
+           check(TokenKind::If)||check(TokenKind::While)||check(TokenKind::Return)||check(TokenKind::Identifier))return;
         advance();
     }
 }
@@ -101,7 +101,47 @@ Statement Parser::whileStatement(){
     result.body=blockContents();
     return result;
 }
+Function Parser::functionDeclaration(){
+    Function function;
+    function.line=peek().line;
+    advance(); // fn
+    if(!check(TokenKind::Identifier)){
+        errors_.push_back("Line "+std::to_string(peek().line)+": expected function name");
+        synchronize();
+        return function;
+    }
+    function.name=advance().lexeme;
+    consume(TokenKind::LeftParen,"expected '(' after function name");
+    if(!check(TokenKind::RightParen)){
+        do{
+            Parameter parameter;
+            parameter.line=peek().line;
+            if(!check(TokenKind::Identifier)){
+                errors_.push_back("Line "+std::to_string(peek().line)+": expected parameter name");
+                break;
+            }
+            parameter.name=advance().lexeme;
+            if(consume(TokenKind::Colon,"expected ':' after parameter name")){
+                if(check(TokenKind::Identifier))parameter.declaredType=advance().lexeme;
+                else errors_.push_back("Line "+std::to_string(peek().line)+": expected parameter type");
+            }
+            function.parameters.push_back(std::move(parameter));
+        }while(match(TokenKind::Comma));
+    }
+    consume(TokenKind::RightParen,"expected ')' after parameters");
+    consume(TokenKind::Arrow,"expected '->' and a return type after parameters");
+    if(check(TokenKind::Identifier))function.returnType=advance().lexeme;
+    else errors_.push_back("Line "+std::to_string(peek().line)+": expected function return type");
+    consume(TokenKind::LeftBrace,"expected '{' before function body");
+    function.body=blockContents();
+    return function;
+}
+
 Statement Parser::statement(){
+    if(check(TokenKind::Return)){
+        Statement result;result.kind=Statement::Kind::Return;result.line=peek().line;advance();
+        result.expression=expression();consume(TokenKind::Semicolon,"expected ';' after return value");return result;
+    }
     if(check(TokenKind::Let))return declaration(TokenKind::Let);
     if(check(TokenKind::Var))return declaration(TokenKind::Var);
     if(check(TokenKind::Display))return displayStatement();
@@ -196,7 +236,8 @@ std::shared_ptr<Expr> Parser::primary(){
 }
 Program Parser::parse(){
     Program program;
-    if(!consume(TokenKind::Flow,"expected 'flow'")||
+    while(check(TokenKind::Fn))program.functions.push_back(functionDeclaration());
+    if(!consume(TokenKind::Flow,"expected 'flow'" )||
        !consume(TokenKind::Main,"expected 'main' after 'flow'")||
        !consume(TokenKind::LeftBrace,"expected '{' after flow main"))return program;
     program.statements=blockContents();
