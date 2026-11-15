@@ -291,10 +291,16 @@ bool compileStatements(const std::vector<Statement>& statements,Context& context
             const auto otherwise=context.bytecode.code.size();emit(context,OpCode::JumpIfFalse);
             if(!compileBlock(statement.body,context,errors,insideLoop))ok=false;
             if(!statement.elseBody.empty()) {
-                const auto done=context.bytecode.code.size();emit(context,OpCode::Jump);
+                const bool thenTerminates=definitelyReturns(statement.body);
+                std::size_t done=0;
+                if(!thenTerminates) {
+                    done=context.bytecode.code.size();
+                    emit(context,OpCode::Jump);
+                }
                 context.bytecode.code[otherwise].slot=static_cast<std::uint32_t>(context.bytecode.code.size());
                 if(!compileBlock(statement.elseBody,context,errors,insideLoop))ok=false;
-                context.bytecode.code[done].slot=static_cast<std::uint32_t>(context.bytecode.code.size());
+                if(!thenTerminates)
+                    context.bytecode.code[done].slot=static_cast<std::uint32_t>(context.bytecode.code.size());
             } else {
                 context.bytecode.code[otherwise].slot=static_cast<std::uint32_t>(context.bytecode.code.size());
             }
