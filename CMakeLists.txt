@@ -21,9 +21,6 @@ add_library(taviq_core
     memory/heap.cpp
     stdlib/stdlib.cpp
     security/policy.cpp
-    ai/ai_provider.cpp
-    ir/ir.cpp
-    memory/heap.cpp
 )
 target_include_directories(taviq_core PUBLIC include)
 target_link_libraries(taviq_core PUBLIC Threads::Threads)
