@@ -7,7 +7,7 @@ TAVIQ is an evolving open-source programming-language and compute-runtime projec
 - C++20 frontend with typed functions, parameters, return values, recursive calls, let/var, number/string/bool annotations, if/else and while.
 - QVM v3 with real CALL/RETURN instructions, isolated frames, recursion and typed control-flow verification.
 - QVM v1 and v2 loading compatibility.
-- Portable C source lowering for the currently supported scalar/control-flow subset. User-defined functions run through QVM and are rejected by the C backend until function lowering is implemented.
+- Portable C source lowering for the supported scalar/control-flow subset, including typed user functions, parameters, calls, recursion and return values. Aggregate types and string concatenation are not yet lowered by the native C backend.
 - Formatter/linter, disassembler, trace/breakpoint interface and deterministic QVM mutation tests.
 
 ## Runtime and compute foundations
